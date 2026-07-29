@@ -1,0 +1,51 @@
+Running `(cd /Users/sawatt/.pub-cache/hosted/pub.dev/objective_c-9.5.0/; ANDROID_HOME=/Users/sawatt/Library/Android/sdk TMPDIR=/var/folders/f5/3zr2wccj5_1_4s2rml9gx20c0000gn/T/ PATH=/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:/Users/sawatt/.codex/tmp/arg0/codex-arg0ggnHJ3:/Users/sawatt/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/sawatt/.pyenv/shims:/Users/sawatt/.pyenv/bin:/opt/homebrew/sbin:/Users/sawatt/Library/Android/sdk/emulator:/Users/sawatt/Library/Android/sdk/platform-tools:/Users/sawatt/Library/Android/sdk/tools:/Users/sawatt/.pub-cache/bin:/Users/sawatt/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/Codex.app/Contents/Resources HOME=/Users/sawatt /opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart --packages=/Users/sawatt/StudioProjects/gallaemalae/.dart_tool/package_config.json /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/objective_c/7ad245dadc/hook.dill --config=/Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/objective_c/7ad245dadc/input.json )`.
+INFO: 2026-07-29 15:51:34.292789: Using compiler /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang from BuildInput.cCompiler.cc.
+
+INFO: 2026-07-29 15:51:34.296592: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -c /Users/sawatt/.pub-cache/hosted/pub.dev/objective_c-9.5.0/src/include/dart_api_dl.c -fpic -gline-tables-only -I src -o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/include/dart_api_dl.c.o
+
+INFO: 2026-07-29 15:51:34.297861: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/sawatt/.pub-cache/hosted/pub.dev/objective_c-9.5.0/src/input_stream_adapter.m -fpic -gline-tables-only -I src -o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7INFO: 2026-07-29 15:51:34.297942: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/sawatt/.pub-cache/hosted/pub.dev/objective_c-9.5.0/src/objective_c.m -fpic -gline-tables-only -I src -o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.m.o
+
+INFO: 2026-07-29 15:51:34.298270: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/sawatt/.pub-cache/hosted/pub.dev/objective_c-9.5.0/src/ns_number.m -fpic -gline-tables-only -I src -o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/ns_number.m.o
+
+INFO: 2026-07-29 15:51:34.298358: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/sawatt/.pub-cache/hosted/pub.dev/objective_c-9.5.0/src/protocol.m -fpic -gline-tables-only -I src -o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/protocol.m.o
+
+INFO: 2026-07-29 15:51:34.298467: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/sawatt/.pub-cache/hosted/pub.dev/objective_c-9.5.0/src/objective_c_bindings_generated.m -fpic -gline-tables-only -I src -o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c_bindings_generated.m.o
+
+INFO: 2026-07-29 15:51:34.532368: 
+INFO: 2026-07-29 15:51:34.532446: 
+INFO: 2026-07-29 15:51:34.532471: Generated /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.c.o
+
+INFO: 2026-07-29 15:51:34.533058: 
+INFO: 2026-07-29 15:51:34.533080: 
+INFO: 2026-07-29 15:51:34.533093: Generated /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/include/dart_api_dl.c.o
+
+INFO: 2026-07-29 15:51:34.534213: 
+INFO: 2026-07-29 15:51:34.534251: 
+INFO: 2026-07-29 15:51:34.534268: Generated /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/observer.m.o
+
+INFO: 2026-07-29 15:51:34.537583: 
+INFO: 2026-07-29 15:51:34.537632: 
+INFO: 2026-07-29 15:51:34.537678: Generated /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/protocol.m.o
+
+INFO: 2026-07-29 15:51:34.856709: 
+INFO: 2026-07-29 15:51:34.856854: 
+INFO: 2026-07-29 15:51:34.856881: Generated /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/ns_number.m.o
+
+INFO: 2026-07-29 15:51:34.872231: 
+INFO: 2026-07-29 15:51:34.872304: 
+INFO: 2026-07-29 15:51:34.872337: Generated /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.m.o
+
+INFO: 2026-07-29 15:51:34.872535: 
+INFO: 2026-07-29 15:51:34.872565: 
+INFO: 2026-07-29 15:51:34.872572: Generated /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/input_stream_adapter.m.o
+
+INFO: 2026-07-29 15:51:34.905689: 
+INFO: 2026-07-29 15:51:34.905716: 
+INFO: 2026-07-29 15:51:34.905723: Generated /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c_bindings_generated.m.o
+
+INFO: 2026-07-29 15:51:34.906200: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -shared -Wl,-encryptable -undefined dynamic_lookup -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/include/dart_api_dl.c.o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.c.o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/input_stream_adapter.m.o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.m.o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/observer.m.o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/ns_number.m.o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/protocol.m.o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c_bindings_generated.m.o -o /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/objective_c.dylib
+
+INFO: 2026-07-29 15:51:35.018445: 
+INFO: 2026-07-29 15:51:35.018487: 
+INFO: 2026-07-29 15:51:35.018495: Generated /Users/sawatt/StudioProjects/gallaemalae/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/objective_c.dylib
+
