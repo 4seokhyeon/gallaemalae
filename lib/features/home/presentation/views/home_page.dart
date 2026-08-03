@@ -1,24 +1,861 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gallaemalae/core/layout/app_layout.dart';
+import 'package:gallaemalae/core/router/app_routes.dart';
 import 'package:gallaemalae/features/home/presentation/view_models/home_view_model.dart';
-import 'package:gallaemalae/presentation/widgets/adaptive_page.dart';
+import 'package:go_router/go_router.dart';
+
+const _brand = Color(0xFFC93A06);
+const _brandDark = Color(0xFFB93403);
+const _green = Color(0xFF098966);
+const _ink = Color(0xFF28252B);
+const _muted = Color(0xFF777079);
+const _pageBackground = Color(0xFFF9F9FC);
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(homeViewModelProvider);
-    return AdaptivePage(
-      title: '홈',
+    ref.watch(homeViewModelProvider);
+
+    final body = Stack(
+      children: [
+        const Positioned.fill(child: ColoredBox(color: _pageBackground)),
+        CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: _HomeHeader()),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                AppLayout.horizontalPadding(context),
+                30,
+                AppLayout.horizontalPadding(context),
+                AppLayout.navigationOverlayInset(context) + 34,
+              ),
+              sliver: SliverList.list(
+                children: const [
+                  _SectionTitle(icon: '✦', title: '오늘의 AI 맞춤 추천'),
+                  SizedBox(height: 16),
+                  _HeroRecommendationCard(),
+                  SizedBox(height: 28),
+                  _TopFestivalsHeader(),
+                  SizedBox(height: 14),
+                  _FestivalCard(
+                    placeId: 'gangwon-wildflower',
+                    title: '강원 산나물 축제',
+                    status: '한적함',
+                    statusColor: _green,
+                    subtitle: '예상 혼잡도 25% · 약 40분 소요',
+                    score: 98,
+                    weather: '쾌적',
+                    wait: '약 16분',
+                    progress: 0.25,
+                    imageUrl:
+                        'https://images.unsplash.com/photo-1497250681960-ef046c08a56e?w=500',
+                  ),
+                  SizedBox(height: 18),
+                  _FestivalCard(
+                    placeId: 'gijang-anchovy',
+                    title: '부산 기장 멸치 축제',
+                    status: '여유',
+                    statusColor: _green,
+                    subtitle: '예상 혼잡도 38% · 약 20분 소요',
+                    score: 82,
+                    weather: '최상',
+                    wait: '약 18분',
+                    progress: 0.38,
+                    imageUrl:
+                        'https://images.unsplash.com/photo-1531058020387-3be344556be6?w=500',
+                  ),
+                  SizedBox(height: 24),
+                  _RainyDayCard(),
+                  SizedBox(height: 24),
+                  _TimeAnalysisCard(),
+                ],
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          right: AppLayout.horizontalPadding(context),
+          bottom: AppLayout.navigationOverlayInset(context) + 18,
+          child: const _SearchButton(),
+        ),
+      ],
+    );
+
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return CupertinoPageScaffold(child: SafeArea(bottom: false, child: body));
+    }
+    return Scaffold(body: SafeArea(bottom: false, child: body));
+  }
+}
+
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFEAE7E7))),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Icon(Icons.menu_rounded, color: _brand, size: 25),
+          const Text(
+            '갈래말래',
+            style: TextStyle(
+              color: _brand,
+              fontSize: 21,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.8,
+            ),
+          ),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(CupertinoIcons.bell, color: _brand, size: 23),
+              Positioned(
+                right: 1,
+                top: 0,
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: _brand,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.icon, required this.title});
+
+  final String icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          icon,
+          style: const TextStyle(
+            color: _brand,
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            color: _ink,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroRecommendationCard extends StatelessWidget {
+  const _HeroRecommendationCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF1B9A5)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 18,
+            offset: Offset(0, 9),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(23),
+        child: Column(
+          children: [
+            AspectRatio(
+              aspectRatio: AppLayout.isCompactWidth(context) ? 1.45 : 1.72,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _FestivalImage(
+                    url:
+                        'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=1000',
+                    fallbackColor: const Color(0xFF153D57),
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0xCC160900)],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 18,
+                    bottom: 19,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _brand,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Text(
+                            'BEST MATCH',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '2026 부산 빛 축제',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
+              child: Column(
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      const preference = _InsightChip(
+                        icon: Icons.person_search_outlined,
+                        label: '사용자 성향',
+                        value: '조용한 밤광장',
+                        iconColor: _brand,
+                      );
+                      const weather = _InsightChip(
+                        icon: Icons.wb_sunny_outlined,
+                        label: '현재 날씨',
+                        value: '맑고 선선함',
+                        iconColor: Color(0xFF0958FF),
+                      );
+                      if (constraints.maxWidth < 300) {
+                        return const Column(
+                          children: [preference, SizedBox(height: 10), weather],
+                        );
+                      }
+                      return const Row(
+                        children: [
+                          Expanded(child: preference),
+                          SizedBox(width: 12),
+                          Expanded(child: weather),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(17),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1EC),
+                      borderRadius: BorderRadius.circular(17),
+                      border: Border.all(color: const Color(0xFFFFC8B5)),
+                    ),
+                    child: const Text.rich(
+                      TextSpan(
+                        style: TextStyle(
+                          color: Color(0xFF87341E),
+                          height: 1.65,
+                          fontSize: 14,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: 'AI 분석: ',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          TextSpan(
+                            text:
+                                '현재 여유로운 혼잡도와 맑은 하늘, '
+                                '사용자가 선호하는 한적한 분위기가 완벽하게 '
+                                '조화를 이루는 최고의 방문 타이밍입니다.',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 17),
+                  _PrimaryButton(
+                    label: '실시간 혼잡도 리포트 보기',
+                    onTap: () => context.push(AppRoutes.detail('busan-light')),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InsightChip extends StatelessWidget {
+  const _InsightChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.iconColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 61,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F4F7),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 22),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(color: _muted, fontSize: 11),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: _ink, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrimaryButton extends StatelessWidget {
+  const _PrimaryButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 56,
+        width: double.infinity,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: _brandDark,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 12,
+              offset: Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TopFestivalsHeader extends StatelessWidget {
+  const _TopFestivalsHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          '맞춤 추천 TOP 3',
+          style: TextStyle(
+            color: _ink,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        Text('전체보기 ›', style: TextStyle(color: _brand, fontSize: 14)),
+      ],
+    );
+  }
+}
+
+class _FestivalCard extends StatelessWidget {
+  const _FestivalCard({
+    required this.placeId,
+    required this.title,
+    required this.status,
+    required this.statusColor,
+    required this.subtitle,
+    required this.score,
+    required this.weather,
+    required this.wait,
+    required this.progress,
+    required this.imageUrl,
+  });
+
+  final String placeId;
+  final String title;
+  final String status;
+  final Color statusColor;
+  final String subtitle;
+  final int score;
+  final String weather;
+  final String wait;
+  final double progress;
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push(AppRoutes.detail(placeId)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFF0B8A4)),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 80,
+                      height: 78,
+                      child: _FestivalImage(
+                        url: imageUrl,
+                        fallbackColor: const Color(0xFFDCE8DE),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: const TextStyle(
+                                  color: _ink,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              status,
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(color: _muted, fontSize: 12),
+                        ),
+                        const SizedBox(height: 11),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 4,
+                            backgroundColor: const Color(0xFFE7E7EB),
+                            valueColor: const AlwaysStoppedAnimation(_green),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFF1E5E1)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: _brand, size: 15),
+                      SizedBox(width: 5),
+                      Text(
+                        '추천 사유',
+                        style: TextStyle(color: _brand, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 9),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _Metric(value: '$score%', label: '성향 일치'),
+                      ),
+                      const _MetricDivider(),
+                      Expanded(
+                        child: _Metric(value: weather, label: '날씨 적합도'),
+                      ),
+                      const _MetricDivider(),
+                      Expanded(
+                        child: _Metric(value: wait, label: '여유 지속'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: _ink,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(label, style: const TextStyle(color: _muted, fontSize: 11)),
+      ],
+    );
+  }
+}
+
+class _MetricDivider extends StatelessWidget {
+  const _MetricDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 34, color: const Color(0xFFECE5E3));
+  }
+}
+
+class _RainyDayCard extends StatelessWidget {
+  const _RainyDayCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8ECFF),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFB8C6FF)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('AI 맞춤 추천', style: TextStyle(fontSize: 24)),
+          const Row(
+            children: [
+              Icon(CupertinoIcons.cloud_rain, color: Color(0xFF0758FF)),
+              SizedBox(width: 12),
+              Text(
+                '비 오는 오후, 실내 축제 추천',
+                style: TextStyle(color: _ink, fontSize: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _IndoorPlaceTile(
+            icon: Icons.museum_outlined,
+            title: '국립중앙박물관 기획전',
+            subtitle: '실내 쾌적도 95% · 혼잡도 낮음',
+            onTap: () => context.push(AppRoutes.detail('national-museum')),
+          ),
           const SizedBox(height: 12),
-          Text(state.summary),
+          _IndoorPlaceTile(
+            icon: Icons.theater_comedy_outlined,
+            title: '대학로 소극장 페스티벌',
+            subtitle: '매우 한적함 · 실내 활동 권장',
+            onTap: () => context.push(AppRoutes.detail('daehakro-theater')),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _IndoorPlaceTile extends StatelessWidget {
+  const _IndoorPlaceTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F3FA),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: const Color(0xFF0758FF)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(color: _ink, fontSize: 14),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: _muted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: _ink, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeAnalysisCard extends StatelessWidget {
+  const _TimeAnalysisCard();
+
+  @override
+  Widget build(BuildContext context) {
+    const heights = [16.0, 26.0, 40.0, 50.0, 25.0, 16.0, 9.0];
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+      decoration: BoxDecoration(
+        color: _brandDark,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26000000),
+            blurRadius: 20,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '오후 6시 이후가\n가장 쾌적합니다',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '주말 데이터 분석 결과, 일몰 직후 방문객이 30%\n감소하는 패턴을 보이고 있습니다.',
+            style: TextStyle(
+              color: Color(0xFFFFD8CA),
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            height: 52,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var index = 0; index < heights.length; index++)
+                  Expanded(
+                    child: Container(
+                      height: heights[index],
+                      margin: const EdgeInsets.only(right: 4),
+                      decoration: BoxDecoration(
+                        color: Color.lerp(
+                          const Color(0xFFC85329),
+                          const Color(0xFFE78967),
+                          index / heights.length,
+                        ),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () => context.go(AppRoutes.analysis),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Text(
+                '분석 리포트 전체보기',
+                style: TextStyle(color: _brand, fontSize: 13),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchButton extends StatelessWidget {
+  const _SearchButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.go(AppRoutes.map),
+      child: Container(
+        width: 58,
+        height: 58,
+        decoration: const BoxDecoration(
+          color: _brandDark,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 12,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        child: const Icon(Icons.search_rounded, color: Colors.white, size: 31),
+      ),
+    );
+  }
+}
+
+class _FestivalImage extends StatelessWidget {
+  const _FestivalImage({required this.url, required this.fallbackColor});
+
+  final String url;
+  final Color fallbackColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return ColoredBox(
+          color: fallbackColor,
+          child: const Center(
+            child: Icon(Icons.festival_outlined, color: Colors.white, size: 38),
+          ),
+        );
+      },
     );
   }
 }

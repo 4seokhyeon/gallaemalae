@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:gallaemalae/core/layout/app_layout.dart';
 
 class AdaptivePage extends StatelessWidget {
   const AdaptivePage({required this.title, required this.child, super.key});
@@ -21,8 +22,13 @@ class AdaptivePage extends StatelessWidget {
         ),
         child: SafeArea(
           bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 90),
+          child: ResponsiveContent(
+            padding: EdgeInsets.fromLTRB(
+              AppLayout.horizontalPadding(context),
+              20,
+              AppLayout.horizontalPadding(context),
+              AppLayout.navigationOverlayInset(context) + 16,
+            ),
             child: child,
           ),
         ),
@@ -32,8 +38,13 @@ class AdaptivePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+        child: ResponsiveContent(
+          padding: EdgeInsets.fromLTRB(
+            AppLayout.horizontalPadding(context),
+            20,
+            AppLayout.horizontalPadding(context),
+            16,
+          ),
           child: child,
         ),
       ),
