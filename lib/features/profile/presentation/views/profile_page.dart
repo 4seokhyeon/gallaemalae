@@ -1,14 +1,732 @@
-import 'package:flutter/widgets.dart';
-import 'package:gallaemalae/presentation/widgets/adaptive_page.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gallaemalae/core/layout/app_layout.dart';
+import 'package:gallaemalae/core/navigation/tab_reselection.dart';
+import 'package:gallaemalae/core/router/app_routes.dart';
+import 'package:gallaemalae/domain/entities/festival_personality.dart';
+import 'package:gallaemalae/features/personality/presentation/view_models/personality_view_model.dart';
+import 'package:go_router/go_router.dart';
 
-class ProfilePage extends StatelessWidget {
+const _brand = Color(0xFFC93A06);
+const _orange = Color(0xFFFF6338);
+const _ink = Color(0xFF29262C);
+const _muted = Color(0xFF756E70);
+const _background = Color(0xFFF8F8FB);
+
+class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
+  @override
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends ConsumerState<ProfilePage> {
+  bool _crowdAlerts = true;
 
   @override
   Widget build(BuildContext context) {
-    return const AdaptivePage(
-      title: '프로필',
-      child: Center(child: Text('개인 설정 · 제보 내역 · 관심 축제')),
+    final personality = ref.watch(personalityProvider).value;
+    final body = ReselectableTabScrollView(
+      tabIndex: 3,
+      builder: (controller) => CustomScrollView(
+        controller: controller,
+        slivers: [
+          const SliverToBoxAdapter(child: _ProfileHeader()),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              AppLayout.horizontalPadding(context),
+              24,
+              AppLayout.horizontalPadding(context),
+              AppLayout.navigationOverlayInset(context) + 30,
+            ),
+            sliver: SliverList.list(
+              children: [
+                const _UserCard(),
+                const SizedBox(height: 20),
+                _PersonalityCard(personality: personality, onRetest: _retest),
+                const SizedBox(height: 20),
+                const Row(
+                  children: [
+                    Expanded(
+                      child: _StatCard(
+                        label: '내 제보 횟수',
+                        value: '48',
+                        unit: '회',
+                        color: Color(0xFF1359E8),
+                      ),
+                    ),
+                    SizedBox(width: 14),
+                    Expanded(
+                      child: _StatCard(
+                        label: '관심 축제',
+                        value: '12',
+                        unit: '곳',
+                        color: _brand,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 25),
+                const _SectionTitle(
+                  icon: Icons.favorite_rounded,
+                  title: '나의 관심 축제',
+                  trailing: '전체보기',
+                ),
+                const SizedBox(height: 13),
+                const _FavoriteFestivals(),
+                const SizedBox(height: 26),
+                const _HistoryTabs(),
+                const SizedBox(height: 15),
+                const _VisitCard(
+                  title: '광화문 야간 개장',
+                  date: '2023.10.12',
+                  crowd: '매우 혼잡',
+                  tags: ['#커플_데이트', '#성공적'],
+                ),
+                const SizedBox(height: 12),
+                const _VisitCard(
+                  title: '부산 불꽃축제',
+                  date: '2023.11.04',
+                  crowd: '보통',
+                  tags: [],
+                ),
+                const SizedBox(height: 28),
+                const _SectionTitle(
+                  icon: Icons.settings_outlined,
+                  title: '앱 설정 및 데이터 최적화',
+                ),
+                const SizedBox(height: 13),
+                _SettingsCard(
+                  crowdAlerts: _crowdAlerts,
+                  onAlertsChanged: (value) =>
+                      setState(() => _crowdAlerts = value),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return CupertinoPageScaffold(
+        backgroundColor: _background,
+        child: SafeArea(bottom: false, child: body),
+      );
+    }
+    return Scaffold(
+      backgroundColor: _background,
+      body: SafeArea(bottom: false, child: body),
     );
   }
+
+  void _retest() {
+    ref.read(personalityTestControllerProvider.notifier).reset();
+    context.push(AppRoutes.personalityTest);
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader();
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 56,
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      border: Border(bottom: BorderSide(color: Color(0xFFEAE7E7))),
+    ),
+    child: const Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Icon(Icons.menu_rounded, color: _brand, size: 25),
+        Text(
+          '갈래말래',
+          style: TextStyle(
+            color: _brand,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        Icon(CupertinoIcons.bell, color: _brand, size: 23),
+      ],
+    ),
+  );
+}
+
+class _UserCard extends StatelessWidget {
+  const _UserCard();
+  @override
+  Widget build(BuildContext context) => const _WhiteCard(
+    child: Row(
+      children: [
+        CircleAvatar(
+          radius: 38,
+          backgroundColor: Color(0xFFFFE3DA),
+          child: Icon(Icons.person_rounded, color: _brand, size: 46),
+        ),
+        SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '김지수 님',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                children: [
+                  _MiniTag('축제 매니아', Color(0xFF1359E8)),
+                  _MiniTag('혼잡도 탐지기', _brand),
+                ],
+              ),
+              SizedBox(height: 10),
+              LinearProgressIndicator(
+                value: .58,
+                minHeight: 6,
+                color: _orange,
+                backgroundColor: Color(0xFFE4E4E7),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(width: 10),
+        Icon(Icons.settings_suggest_outlined, color: Color(0xFF5F514D)),
+      ],
+    ),
+  );
+}
+
+class _MiniTag extends StatelessWidget {
+  const _MiniTag(this.text, this.color);
+  final String text;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .10),
+      borderRadius: BorderRadius.circular(5),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600),
+    ),
+  );
+}
+
+class _PersonalityCard extends StatelessWidget {
+  const _PersonalityCard({required this.personality, required this.onRetest});
+  final FestivalPersonality? personality;
+  final VoidCallback onRetest;
+  @override
+  Widget build(BuildContext context) => _WhiteCard(
+    child: Column(
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.psychology_alt_outlined, color: _brand),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                '나의 축제 성향',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: onRetest,
+              icon: const Icon(Icons.refresh_rounded, size: 15),
+              label: const Text('다시 테스트하기'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1359E8),
+                textStyle: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8EBE6),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  color: _orange,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.local_fire_department_rounded,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      personality?.title ?? '성향 테스트가 필요해요',
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      personality?.description ?? '테스트를 통해 맞춤 축제를 추천받아 보세요.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _muted,
+                        fontSize: 11,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.color,
+  });
+  final String label, value, unit;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => _WhiteCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: _muted, fontSize: 12)),
+        const SizedBox(height: 7),
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: value,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 38,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              TextSpan(
+                text: unit,
+                style: const TextStyle(color: _ink, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.icon, required this.title, this.trailing});
+  final IconData icon;
+  final String title;
+  final String? trailing;
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, color: _brand, size: 22),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          title,
+          style: const TextStyle(
+            color: _ink,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      if (trailing != null)
+        Text(
+          trailing!,
+          style: const TextStyle(color: Color(0xFF1359E8), fontSize: 12),
+        ),
+    ],
+  );
+}
+
+class _FavoriteFestivals extends StatelessWidget {
+  const _FavoriteFestivals();
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 216,
+    child: ListView(
+      scrollDirection: Axis.horizontal,
+      children: const [
+        _FestivalTile(
+          title: '서울 세계 불꽃 축제',
+          subtitle: '10.05 ~ 10.07 | 여의도 한강공원',
+          match: '취향 98%',
+          color: Color(0xFF233D67),
+        ),
+        SizedBox(width: 13),
+        _FestivalTile(
+          title: '아침고요수목원 빛축제',
+          subtitle: '12.01 ~ 03.14 | 가평',
+          match: '취향 82%',
+          color: Color(0xFF21492F),
+        ),
+      ],
+    ),
+  );
+}
+
+class _FestivalTile extends StatelessWidget {
+  const _FestivalTile({
+    required this.title,
+    required this.subtitle,
+    required this.match,
+    required this.color,
+  });
+  final String title, subtitle;
+  final Color color;
+  final String match;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 255,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(13),
+      boxShadow: const [BoxShadow(color: Color(0x0D000000), blurRadius: 12)],
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(13),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 125,
+            color: color,
+            child: const Center(
+              child: Icon(
+                Icons.celebration_rounded,
+                color: Colors.white,
+                size: 56,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  color: const Color(0xFFFFE8DF),
+                  child: Text(
+                    match,
+                    style: const TextStyle(
+                      color: _brand,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: _muted, fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _HistoryTabs extends StatelessWidget {
+  const _HistoryTabs();
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 44,
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFE6E6E9),
+      borderRadius: BorderRadius.circular(24),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Container(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              '방문 기록',
+              style: TextStyle(color: _brand, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const Expanded(
+          child: Center(
+            child: Text('혼잡도 제보', style: TextStyle(color: _muted)),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _VisitCard extends StatelessWidget {
+  const _VisitCard({
+    required this.title,
+    required this.date,
+    required this.crowd,
+    required this.tags,
+  });
+  final String title, date, crowd;
+  final List<String> tags;
+  @override
+  Widget build(BuildContext context) => _WhiteCard(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9E9E3),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.history_rounded, color: _brand),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    date,
+                    style: const TextStyle(color: _muted, fontSize: 10),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '방문 당시 혼잡도: $crowd',
+                style: TextStyle(
+                  color: crowd == '매우 혼잡' ? _orange : _muted,
+                  fontSize: 11,
+                ),
+              ),
+              if (tags.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  children: tags.map((tag) => _MiniTag(tag, _muted)).toList(),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({
+    required this.crowdAlerts,
+    required this.onAlertsChanged,
+  });
+  final bool crowdAlerts;
+  final ValueChanged<bool> onAlertsChanged;
+  @override
+  Widget build(BuildContext context) => _WhiteCard(
+    padding: EdgeInsets.zero,
+    child: Column(
+      children: [
+        _SettingRow(
+          icon: Icons.notifications_active_outlined,
+          title: '실시간 혼잡도 알림',
+          subtitle: '관심 축제가 혼잡해지면 즉시 알림',
+          trailing: _PlatformSettingsSwitch(
+            value: crowdAlerts,
+            onChanged: onAlertsChanged,
+          ),
+        ),
+        const Divider(height: 1),
+        const _SettingRow(
+          icon: Icons.analytics_outlined,
+          title: '데이터 분석 기준 설정',
+          subtitle: '15분 단위 분석',
+          trailing: Text(
+            '15분',
+            style: TextStyle(
+              color: Color(0xFF1359E8),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const Divider(height: 1),
+        const _SettingRow(
+          icon: Icons.shield_outlined,
+          title: '개인정보 및 위치 데이터',
+          trailing: Icon(Icons.chevron_right_rounded),
+        ),
+        const Divider(height: 1),
+        const _SettingRow(
+          icon: Icons.logout_rounded,
+          title: '로그아웃',
+          titleColor: Colors.red,
+        ),
+      ],
+    ),
+  );
+}
+
+class _SettingRow extends StatelessWidget {
+  const _SettingRow({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.titleColor = _ink,
+  });
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final Color titleColor;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+    child: Row(
+      children: [
+        Icon(
+          icon,
+          color: titleColor == Colors.red
+              ? Colors.red
+              : const Color(0xFF66504A),
+          size: 22,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: titleColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (subtitle != null)
+                Text(
+                  subtitle!,
+                  style: const TextStyle(color: _muted, fontSize: 10),
+                ),
+            ],
+          ),
+        ),
+        ?trailing,
+      ],
+    ),
+  );
+}
+
+class _PlatformSettingsSwitch extends StatelessWidget {
+  const _PlatformSettingsSwitch({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return CupertinoSwitch(
+        value: value,
+        activeTrackColor: _brand,
+        onChanged: onChanged,
+      );
+    }
+    return Switch(value: value, activeTrackColor: _brand, onChanged: onChanged);
+  }
+}
+
+class _WhiteCard extends StatelessWidget {
+  const _WhiteCard({
+    required this.child,
+    this.padding = const EdgeInsets.all(17),
+  });
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: padding,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0E000000),
+          blurRadius: 18,
+          offset: Offset(0, 6),
+        ),
+      ],
+    ),
+    child: child,
+  );
 }

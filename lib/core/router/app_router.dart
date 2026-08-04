@@ -5,49 +5,52 @@ import 'package:gallaemalae/features/detail/presentation/views/detail_page.dart'
 import 'package:gallaemalae/features/home/presentation/views/home_page.dart';
 import 'package:gallaemalae/features/map/presentation/views/map_page.dart';
 import 'package:gallaemalae/features/profile/presentation/views/profile_page.dart';
+import 'package:gallaemalae/features/personality/presentation/views/personality_result_page.dart';
+import 'package:gallaemalae/features/personality/presentation/views/personality_test_page.dart';
+import 'package:gallaemalae/features/splash/presentation/views/splash_page.dart';
 import 'package:gallaemalae/presentation/views/adaptive_app_shell.dart';
 import 'package:go_router/go_router.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: AppRoutes.home,
+    initialLocation: AppRoutes.splash,
     routes: [
-      StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) {
-          return AdaptiveAppShell(navigationShell: navigationShell);
+      GoRoute(
+        path: AppRoutes.splash,
+        builder: (context, state) => const SplashPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.personalityTest,
+        builder: (context, state) => const PersonalityTestPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.personalityResult,
+        builder: (context, state) => const PersonalityResultPage(),
+      ),
+      ShellRoute(
+        builder: (context, state, child) {
+          return AdaptiveAppShell(
+            currentIndex: _tabIndexFor(state.uri.path),
+            child: child,
+          );
         },
-        branches: [
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: AppRoutes.home,
-                builder: (context, state) => const HomePage(),
-              ),
-            ],
+        routes: [
+          GoRoute(
+            path: AppRoutes.home,
+            pageBuilder: (_, _) => const NoTransitionPage(child: HomePage()),
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: AppRoutes.map,
-                builder: (context, state) => const MapPage(),
-              ),
-            ],
+          GoRoute(
+            path: AppRoutes.map,
+            pageBuilder: (_, _) => const NoTransitionPage(child: MapPage()),
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: AppRoutes.analysis,
-                builder: (context, state) => const AnalysisPage(),
-              ),
-            ],
+          GoRoute(
+            path: AppRoutes.analysis,
+            pageBuilder: (_, _) =>
+                const NoTransitionPage(child: AnalysisPage()),
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: AppRoutes.profile,
-                builder: (context, state) => const ProfilePage(),
-              ),
-            ],
+          GoRoute(
+            path: AppRoutes.profile,
+            pageBuilder: (_, _) => const NoTransitionPage(child: ProfilePage()),
           ),
         ],
       ),
@@ -60,3 +63,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+int _tabIndexFor(String path) => switch (path) {
+  AppRoutes.map => 1,
+  AppRoutes.analysis => 2,
+  AppRoutes.profile => 3,
+  _ => 0,
+};

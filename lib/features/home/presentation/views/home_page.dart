@@ -3,8 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gallaemalae/core/layout/app_layout.dart';
+import 'package:gallaemalae/core/navigation/tab_reselection.dart';
 import 'package:gallaemalae/core/router/app_routes.dart';
 import 'package:gallaemalae/features/home/presentation/view_models/home_view_model.dart';
+import 'package:gallaemalae/features/personality/presentation/view_models/personality_view_model.dart';
 import 'package:go_router/go_router.dart';
 
 const _brand = Color(0xFFC93A06);
@@ -20,63 +22,70 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(homeViewModelProvider);
+    final personality = ref.watch(personalityProvider).value;
 
     final body = Stack(
       children: [
         const Positioned.fill(child: ColoredBox(color: _pageBackground)),
-        CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _HomeHeader()),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(
-                AppLayout.horizontalPadding(context),
-                30,
-                AppLayout.horizontalPadding(context),
-                AppLayout.navigationOverlayInset(context) + 34,
+        ReselectableTabScrollView(
+          tabIndex: 0,
+          builder: (controller) => CustomScrollView(
+            controller: controller,
+            slivers: [
+              SliverToBoxAdapter(child: _HomeHeader()),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  AppLayout.horizontalPadding(context),
+                  30,
+                  AppLayout.horizontalPadding(context),
+                  AppLayout.navigationOverlayInset(context) + 34,
+                ),
+                sliver: SliverList.list(
+                  children: [
+                    const _SectionTitle(icon: '✦', title: '오늘의 AI 맞춤 추천'),
+                    const SizedBox(height: 16),
+                    _HeroRecommendationCard(
+                      personalityLabel: personality?.shortTitle ?? '성향 분석 중',
+                    ),
+                    const SizedBox(height: 28),
+                    const _TopFestivalsHeader(),
+                    const SizedBox(height: 14),
+                    const _FestivalCard(
+                      placeId: 'gangwon-wildflower',
+                      title: '강원 산나물 축제',
+                      status: '한적함',
+                      statusColor: _green,
+                      subtitle: '예상 혼잡도 25% · 약 40분 소요',
+                      score: 98,
+                      weather: '쾌적',
+                      wait: '약 16분',
+                      progress: 0.25,
+                      imageUrl:
+                          'https://images.unsplash.com/photo-1497250681960-ef046c08a56e?w=500',
+                    ),
+                    const SizedBox(height: 18),
+                    const _FestivalCard(
+                      placeId: 'gijang-anchovy',
+                      title: '부산 기장 멸치 축제',
+                      status: '여유',
+                      statusColor: _green,
+                      subtitle: '예상 혼잡도 38% · 약 20분 소요',
+                      score: 82,
+                      weather: '최상',
+                      wait: '약 18분',
+                      progress: 0.38,
+                      imageUrl:
+                          'https://images.unsplash.com/photo-1531058020387-3be344556be6?w=500',
+                    ),
+                    const SizedBox(height: 24),
+                    const _RainyDayCard(),
+                    const SizedBox(height: 24),
+                    const _TimeAnalysisCard(),
+                  ],
+                ),
               ),
-              sliver: SliverList.list(
-                children: const [
-                  _SectionTitle(icon: '✦', title: '오늘의 AI 맞춤 추천'),
-                  SizedBox(height: 16),
-                  _HeroRecommendationCard(),
-                  SizedBox(height: 28),
-                  _TopFestivalsHeader(),
-                  SizedBox(height: 14),
-                  _FestivalCard(
-                    placeId: 'gangwon-wildflower',
-                    title: '강원 산나물 축제',
-                    status: '한적함',
-                    statusColor: _green,
-                    subtitle: '예상 혼잡도 25% · 약 40분 소요',
-                    score: 98,
-                    weather: '쾌적',
-                    wait: '약 16분',
-                    progress: 0.25,
-                    imageUrl:
-                        'https://images.unsplash.com/photo-1497250681960-ef046c08a56e?w=500',
-                  ),
-                  SizedBox(height: 18),
-                  _FestivalCard(
-                    placeId: 'gijang-anchovy',
-                    title: '부산 기장 멸치 축제',
-                    status: '여유',
-                    statusColor: _green,
-                    subtitle: '예상 혼잡도 38% · 약 20분 소요',
-                    score: 82,
-                    weather: '최상',
-                    wait: '약 18분',
-                    progress: 0.38,
-                    imageUrl:
-                        'https://images.unsplash.com/photo-1531058020387-3be344556be6?w=500',
-                  ),
-                  SizedBox(height: 24),
-                  _RainyDayCard(),
-                  SizedBox(height: 24),
-                  _TimeAnalysisCard(),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
         Positioned(
           right: AppLayout.horizontalPadding(context),
@@ -175,7 +184,9 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _HeroRecommendationCard extends StatelessWidget {
-  const _HeroRecommendationCard();
+  const _HeroRecommendationCard({required this.personalityLabel});
+
+  final String personalityLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -260,10 +271,10 @@ class _HeroRecommendationCard extends StatelessWidget {
                 children: [
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      const preference = _InsightChip(
+                      final preference = _InsightChip(
                         icon: Icons.person_search_outlined,
                         label: '사용자 성향',
-                        value: '조용한 밤광장',
+                        value: personalityLabel,
                         iconColor: _brand,
                       );
                       const weather = _InsightChip(
@@ -273,15 +284,15 @@ class _HeroRecommendationCard extends StatelessWidget {
                         iconColor: Color(0xFF0958FF),
                       );
                       if (constraints.maxWidth < 300) {
-                        return const Column(
+                        return Column(
                           children: [preference, SizedBox(height: 10), weather],
                         );
                       }
-                      return const Row(
+                      return Row(
                         children: [
                           Expanded(child: preference),
-                          SizedBox(width: 12),
-                          Expanded(child: weather),
+                          const SizedBox(width: 12),
+                          const Expanded(child: weather),
                         ],
                       );
                     },

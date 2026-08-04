@@ -37,7 +37,7 @@ class MapViewState {
   }
 }
 
-class MapViewModel extends Notifier<MapViewState> {
+class MapViewModel extends AutoDisposeNotifier<MapViewState> {
   @override
   MapViewState build() => const MapViewState();
 
@@ -58,6 +58,5 @@ class MapViewModel extends Notifier<MapViewState> {
   }
 }
 
-final mapViewModelProvider = NotifierProvider<MapViewModel, MapViewState>(
-  MapViewModel.new,
-);
+final mapViewModelProvider =
+    NotifierProvider.autoDispose<MapViewModel, MapViewState>(MapViewModel.new);

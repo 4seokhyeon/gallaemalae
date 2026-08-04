@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gallaemalae/core/config/app_env.dart';
@@ -28,6 +29,7 @@ class _MapPageState extends ConsumerState<MapPage> {
   GoRouter? _router;
   bool _wasMapRouteActive = false;
   bool _locationRequestInProgress = false;
+  int _locationRequestGeneration = 0;
 
   @override
   void didChangeDependencies() {
@@ -43,6 +45,7 @@ class _MapPageState extends ConsumerState<MapPage> {
 
   @override
   void dispose() {
+    _stopMapLocationTracking();
     _router?.routerDelegate.removeListener(_handleRouteChange);
     super.dispose();
   }
@@ -51,6 +54,11 @@ class _MapPageState extends ConsumerState<MapPage> {
     final path = _router?.routerDelegate.currentConfiguration.uri.path;
     final isMapRouteActive = path == AppRoutes.map;
 
+    if (!isMapRouteActive && _wasMapRouteActive) {
+      // 네이티브 PlatformView가 제거되기 전에 heading/location 구독을
+      // 먼저 중단해야 overlay 채널로 늦은 이벤트가 전달되지 않습니다.
+      _stopMapLocationTracking();
+    }
     if (isMapRouteActive && !_wasMapRouteActive && _mapController != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _moveToCurrentLocation();
@@ -63,32 +71,40 @@ class _MapPageState extends ConsumerState<MapPage> {
     final controller = _mapController;
     if (controller == null || _locationRequestInProgress) return;
 
+    final requestGeneration = ++_locationRequestGeneration;
     _locationRequestInProgress = true;
     ref.read(mapViewModelProvider.notifier).setLocating(true);
 
     final status = await Permission.locationWhenInUse.request();
-    if (!mounted) return;
+    if (!_isMapControllerActive(controller, requestGeneration)) return;
 
     if (status.isGranted) {
       final repository = ref.read(locationRepositoryProvider);
       controller.setLocationTrackingMode(NLocationTrackingMode.follow);
       try {
-        if (!await repository.isServiceEnabled()) return;
+        if (!await repository.isServiceEnabled() ||
+            !_isMapControllerActive(controller, requestGeneration)) {
+          return;
+        }
 
         final cachedPosition = await repository.getLastKnownPosition();
+        if (!_isMapControllerActive(controller, requestGeneration)) return;
         if (cachedPosition != null) {
-          await _updateCamera(cachedPosition, animated: false);
+          await _updateCamera(controller, cachedPosition, animated: false);
         }
 
         final currentPosition = await repository.getCurrentPosition();
-        await _updateCamera(currentPosition, animated: true);
+        if (!_isMapControllerActive(controller, requestGeneration)) return;
+        await _updateCamera(controller, currentPosition, animated: true);
       } catch (error, stackTrace) {
         // GPS 시간 초과 시 마지막 위치 또는 현재 지도 위치를 유지합니다.
         debugPrint('현재 위치 조회 실패: $error');
         debugPrintStack(stackTrace: stackTrace);
       } finally {
-        _locationRequestInProgress = false;
-        if (mounted) {
+        if (_locationRequestGeneration == requestGeneration) {
+          _locationRequestInProgress = false;
+        }
+        if (mounted && _locationRequestGeneration == requestGeneration) {
           ref.read(mapViewModelProvider.notifier).setLocating(false);
         }
       }
@@ -97,6 +113,7 @@ class _MapPageState extends ConsumerState<MapPage> {
 
     _locationRequestInProgress = false;
     ref.read(mapViewModelProvider.notifier).setLocating(false);
+    if (!mounted) return;
     await showCupertinoDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
@@ -120,7 +137,33 @@ class _MapPageState extends ConsumerState<MapPage> {
     );
   }
 
-  Future<void> _updateCamera(GeoPoint point, {required bool animated}) {
+  bool _isMapControllerActive(
+    NaverMapController controller,
+    int requestGeneration,
+  ) {
+    return mounted &&
+        identical(_mapController, controller) &&
+        _locationRequestGeneration == requestGeneration;
+  }
+
+  void _stopMapLocationTracking() {
+    _locationRequestGeneration++;
+    _locationRequestInProgress = false;
+    final controller = _mapController;
+    _mapController = null;
+    if (controller == null) return;
+    try {
+      controller.setLocationTrackingMode(NLocationTrackingMode.none);
+    } on MissingPluginException {
+      // 네이티브 PlatformView가 이미 정리된 경우 추가 호출을 하지 않습니다.
+    }
+  }
+
+  Future<void> _updateCamera(
+    NaverMapController controller,
+    GeoPoint point, {
+    required bool animated,
+  }) {
     final update = NCameraUpdate.scrollAndZoomTo(
       target: NLatLng(point.latitude, point.longitude),
       zoom: 14,
@@ -131,7 +174,7 @@ class _MapPageState extends ConsumerState<MapPage> {
         duration: const Duration(milliseconds: 700),
       );
     }
-    return _mapController!.updateCamera(update).then((_) {});
+    return controller.updateCamera(update).then((_) {});
   }
 
   void _handleMapReady(NaverMapController controller) {
