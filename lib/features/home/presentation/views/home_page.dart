@@ -7,6 +7,7 @@ import 'package:gallaemalae/core/navigation/tab_reselection.dart';
 import 'package:gallaemalae/core/router/app_routes.dart';
 import 'package:gallaemalae/features/home/presentation/view_models/home_view_model.dart';
 import 'package:gallaemalae/features/personality/presentation/view_models/personality_view_model.dart';
+import 'package:gallaemalae/domain/entities/festival.dart';
 import 'package:go_router/go_router.dart';
 
 const _brand = Color(0xFFC93A06);
@@ -21,7 +22,7 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(homeViewModelProvider);
+    final homeState = ref.watch(homeViewModelProvider);
     final personality = ref.watch(personalityProvider).value;
 
     final body = Stack(
@@ -50,33 +51,21 @@ class HomePage extends ConsumerWidget {
                     const SizedBox(height: 28),
                     const _TopFestivalsHeader(),
                     const SizedBox(height: 14),
-                    const _FestivalCard(
-                      placeId: 'gangwon-wildflower',
-                      title: '강원 산나물 축제',
-                      status: '한적함',
-                      statusColor: _green,
-                      subtitle: '예상 혼잡도 25% · 약 40분 소요',
-                      score: 98,
-                      weather: '쾌적',
-                      wait: '약 16분',
-                      progress: 0.25,
-                      imageUrl:
-                          'https://images.unsplash.com/photo-1497250681960-ef046c08a56e?w=500',
-                    ),
-                    const SizedBox(height: 18),
-                    const _FestivalCard(
-                      placeId: 'gijang-anchovy',
-                      title: '부산 기장 멸치 축제',
-                      status: '여유',
-                      statusColor: _green,
-                      subtitle: '예상 혼잡도 38% · 약 20분 소요',
-                      score: 82,
-                      weather: '최상',
-                      wait: '약 18분',
-                      progress: 0.38,
-                      imageUrl:
-                          'https://images.unsplash.com/photo-1531058020387-3be344556be6?w=500',
-                    ),
+                    if (homeState.isRefreshing && homeState.festivals == null)
+                      const Center(child: CircularProgressIndicator())
+                    else if (homeState.errorMessage != null)
+                      _ApiErrorCard(
+                        message: homeState.errorMessage!,
+                        onRetry: () =>
+                            ref.read(homeViewModelProvider.notifier).refresh(),
+                      )
+                    else
+                      for (final festival
+                          in homeState.festivals?.items ??
+                              const <FestivalSummary>[]) ...[
+                        _ApiFestivalCard(festival: festival),
+                        const SizedBox(height: 18),
+                      ],
                     const SizedBox(height: 24),
                     const _RainyDayCard(),
                     const SizedBox(height: 24),
@@ -454,6 +443,102 @@ class _TopFestivalsHeader extends StatelessWidget {
   }
 }
 
+class _ApiFestivalCard extends StatelessWidget {
+  const _ApiFestivalCard({required this.festival});
+
+  final FestivalSummary festival;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => context.push(AppRoutes.detail(festival.id.toString())),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFF0B8A4)),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 86,
+                height: 86,
+                child: _FestivalImage(
+                  url: festival.primaryImageUrl,
+                  fallbackColor: const Color(0xFFDCE8DE),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    festival.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    festival.address,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: _muted, fontSize: 12),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${_shortDate(festival.startDate)} – ${_shortDate(festival.endDate)}',
+                    style: const TextStyle(color: _brand, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: _muted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ApiErrorCard extends StatelessWidget {
+  const _ApiErrorCard({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFF0B8A4)),
+    ),
+    child: Column(
+      children: [
+        Text(message, textAlign: TextAlign.center),
+        const SizedBox(height: 10),
+        TextButton(onPressed: onRetry, child: const Text('다시 시도')),
+      ],
+    ),
+  );
+}
+
+String _shortDate(DateTime date) => '${date.month}.${date.day}';
+
+// Kept for the richer recommendation response planned by the API contract.
+// ignore: unused_element
 class _FestivalCard extends StatelessWidget {
   const _FestivalCard({
     required this.placeId,

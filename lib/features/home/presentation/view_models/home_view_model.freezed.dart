@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$HomeViewState {
 
- String get summary; bool get isRefreshing;
+ String get summary; bool get isRefreshing; FestivalPage? get festivals; String? get errorMessage;
 /// Create a copy of HomeViewState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +25,16 @@ $HomeViewStateCopyWith<HomeViewState> get copyWith => _$HomeViewStateCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is HomeViewState&&(identical(other.summary, summary) || other.summary == summary)&&(identical(other.isRefreshing, isRefreshing) || other.isRefreshing == isRefreshing));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is HomeViewState&&(identical(other.summary, summary) || other.summary == summary)&&(identical(other.isRefreshing, isRefreshing) || other.isRefreshing == isRefreshing)&&(identical(other.festivals, festivals) || other.festivals == festivals)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,summary,isRefreshing);
+int get hashCode => Object.hash(runtimeType,summary,isRefreshing,festivals,errorMessage);
 
 @override
 String toString() {
-  return 'HomeViewState(summary: $summary, isRefreshing: $isRefreshing)';
+  return 'HomeViewState(summary: $summary, isRefreshing: $isRefreshing, festivals: $festivals, errorMessage: $errorMessage)';
 }
 
 
@@ -45,11 +45,11 @@ abstract mixin class $HomeViewStateCopyWith<$Res>  {
   factory $HomeViewStateCopyWith(HomeViewState value, $Res Function(HomeViewState) _then) = _$HomeViewStateCopyWithImpl;
 @useResult
 $Res call({
- String summary, bool isRefreshing
+ String summary, bool isRefreshing, FestivalPage? festivals, String? errorMessage
 });
 
 
-
+$FestivalPageCopyWith<$Res>? get festivals;
 
 }
 /// @nodoc
@@ -62,14 +62,28 @@ class _$HomeViewStateCopyWithImpl<$Res>
 
 /// Create a copy of HomeViewState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? summary = null,Object? isRefreshing = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? summary = null,Object? isRefreshing = null,Object? festivals = freezed,Object? errorMessage = freezed,}) {
   return _then(_self.copyWith(
 summary: null == summary ? _self.summary : summary // ignore: cast_nullable_to_non_nullable
 as String,isRefreshing: null == isRefreshing ? _self.isRefreshing : isRefreshing // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,festivals: freezed == festivals ? _self.festivals : festivals // ignore: cast_nullable_to_non_nullable
+as FestivalPage?,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
+/// Create a copy of HomeViewState
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$FestivalPageCopyWith<$Res>? get festivals {
+    if (_self.festivals == null) {
+    return null;
+  }
 
+  return $FestivalPageCopyWith<$Res>(_self.festivals!, (value) {
+    return _then(_self.copyWith(festivals: value));
+  });
+}
 }
 
 
@@ -151,10 +165,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String summary,  bool isRefreshing)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String summary,  bool isRefreshing,  FestivalPage? festivals,  String? errorMessage)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _HomeViewState() when $default != null:
-return $default(_that.summary,_that.isRefreshing);case _:
+return $default(_that.summary,_that.isRefreshing,_that.festivals,_that.errorMessage);case _:
   return orElse();
 
 }
@@ -172,10 +186,10 @@ return $default(_that.summary,_that.isRefreshing);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String summary,  bool isRefreshing)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String summary,  bool isRefreshing,  FestivalPage? festivals,  String? errorMessage)  $default,) {final _that = this;
 switch (_that) {
 case _HomeViewState():
-return $default(_that.summary,_that.isRefreshing);case _:
+return $default(_that.summary,_that.isRefreshing,_that.festivals,_that.errorMessage);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -192,10 +206,10 @@ return $default(_that.summary,_that.isRefreshing);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String summary,  bool isRefreshing)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String summary,  bool isRefreshing,  FestivalPage? festivals,  String? errorMessage)?  $default,) {final _that = this;
 switch (_that) {
 case _HomeViewState() when $default != null:
-return $default(_that.summary,_that.isRefreshing);case _:
+return $default(_that.summary,_that.isRefreshing,_that.festivals,_that.errorMessage);case _:
   return null;
 
 }
@@ -207,11 +221,13 @@ return $default(_that.summary,_that.isRefreshing);case _:
 
 
 class _HomeViewState implements HomeViewState {
-  const _HomeViewState({this.summary = '데이터를 분석하고 있어요', this.isRefreshing = false});
+  const _HomeViewState({this.summary = '데이터를 분석하고 있어요', this.isRefreshing = false, this.festivals, this.errorMessage});
   
 
 @override@JsonKey() final  String summary;
 @override@JsonKey() final  bool isRefreshing;
+@override final  FestivalPage? festivals;
+@override final  String? errorMessage;
 
 /// Create a copy of HomeViewState
 /// with the given fields replaced by the non-null parameter values.
@@ -223,16 +239,16 @@ _$HomeViewStateCopyWith<_HomeViewState> get copyWith => __$HomeViewStateCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _HomeViewState&&(identical(other.summary, summary) || other.summary == summary)&&(identical(other.isRefreshing, isRefreshing) || other.isRefreshing == isRefreshing));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _HomeViewState&&(identical(other.summary, summary) || other.summary == summary)&&(identical(other.isRefreshing, isRefreshing) || other.isRefreshing == isRefreshing)&&(identical(other.festivals, festivals) || other.festivals == festivals)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,summary,isRefreshing);
+int get hashCode => Object.hash(runtimeType,summary,isRefreshing,festivals,errorMessage);
 
 @override
 String toString() {
-  return 'HomeViewState(summary: $summary, isRefreshing: $isRefreshing)';
+  return 'HomeViewState(summary: $summary, isRefreshing: $isRefreshing, festivals: $festivals, errorMessage: $errorMessage)';
 }
 
 
@@ -243,11 +259,11 @@ abstract mixin class _$HomeViewStateCopyWith<$Res> implements $HomeViewStateCopy
   factory _$HomeViewStateCopyWith(_HomeViewState value, $Res Function(_HomeViewState) _then) = __$HomeViewStateCopyWithImpl;
 @override @useResult
 $Res call({
- String summary, bool isRefreshing
+ String summary, bool isRefreshing, FestivalPage? festivals, String? errorMessage
 });
 
 
-
+@override $FestivalPageCopyWith<$Res>? get festivals;
 
 }
 /// @nodoc
@@ -260,15 +276,29 @@ class __$HomeViewStateCopyWithImpl<$Res>
 
 /// Create a copy of HomeViewState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? summary = null,Object? isRefreshing = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? summary = null,Object? isRefreshing = null,Object? festivals = freezed,Object? errorMessage = freezed,}) {
   return _then(_HomeViewState(
 summary: null == summary ? _self.summary : summary // ignore: cast_nullable_to_non_nullable
 as String,isRefreshing: null == isRefreshing ? _self.isRefreshing : isRefreshing // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,festivals: freezed == festivals ? _self.festivals : festivals // ignore: cast_nullable_to_non_nullable
+as FestivalPage?,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
+/// Create a copy of HomeViewState
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$FestivalPageCopyWith<$Res>? get festivals {
+    if (_self.festivals == null) {
+    return null;
+  }
 
+  return $FestivalPageCopyWith<$Res>(_self.festivals!, (value) {
+    return _then(_self.copyWith(festivals: value));
+  });
+}
 }
 
 // dart format on
