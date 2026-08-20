@@ -5,8 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gallaemalae/core/layout/app_layout.dart';
 import 'package:gallaemalae/core/navigation/tab_reselection.dart';
 import 'package:gallaemalae/core/router/app_routes.dart';
+import 'package:gallaemalae/domain/entities/favorite_place.dart';
 import 'package:gallaemalae/domain/entities/festival_personality.dart';
+import 'package:gallaemalae/domain/entities/visit.dart';
+import 'package:gallaemalae/features/favorites/presentation/view_models/favorites_view_model.dart';
 import 'package:gallaemalae/features/personality/presentation/view_models/personality_view_model.dart';
+import 'package:gallaemalae/features/visits/presentation/view_models/visit_plans_view_model.dart';
+import 'package:gallaemalae/features/onboarding/presentation/view_models/user_name_view_model.dart';
 import 'package:go_router/go_router.dart';
 
 const _brand = Color(0xFFC93A06);
@@ -27,6 +32,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final personality = ref.watch(personalityProvider).value;
+    final favorites = ref.watch(favoritePlacesProvider);
+    final userName = ref.watch(userNameProvider).valueOrNull ?? '사용자';
+    final visitPlans = ref.watch(visitPlansProvider);
     final body = ReselectableTabScrollView(
       tabIndex: 3,
       builder: (controller) => CustomScrollView(
@@ -42,13 +50,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             ),
             sliver: SliverList.list(
               children: [
-                const _UserCard(),
+                _UserCard(name: userName),
                 const SizedBox(height: 20),
                 _PersonalityCard(personality: personality, onRetest: _retest),
                 const SizedBox(height: 20),
-                const Row(
+                Row(
                   children: [
-                    Expanded(
+                    const Expanded(
                       child: _StatCard(
                         label: '내 제보 횟수',
                         value: '48',
@@ -60,7 +68,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     Expanded(
                       child: _StatCard(
                         label: '관심 축제',
-                        value: '12',
+                        value: '${favorites.valueOrNull?.length ?? 0}',
                         unit: '곳',
                         color: _brand,
                       ),
@@ -68,29 +76,24 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   ],
                 ),
                 const SizedBox(height: 25),
-                const _SectionTitle(
+                _SectionTitle(
                   icon: Icons.favorite_rounded,
                   title: '나의 관심 축제',
                   trailing: '전체보기',
+                  onTrailingTap: () =>
+                      context.push(AppRoutes.favoriteFestivals),
                 ),
                 const SizedBox(height: 13),
-                const _FavoriteFestivals(),
+                _FavoriteFestivals(favorites: favorites),
                 const SizedBox(height: 26),
-                const _HistoryTabs(),
+                _SectionTitle(
+                  icon: Icons.calendar_month_rounded,
+                  title: '방문 일정',
+                  trailing: '전체보기',
+                  onTrailingTap: () => context.push(AppRoutes.visitPlans),
+                ),
                 const SizedBox(height: 15),
-                const _VisitCard(
-                  title: '광화문 야간 개장',
-                  date: '2023.10.12',
-                  crowd: '매우 혼잡',
-                  tags: ['#커플_데이트', '#성공적'],
-                ),
-                const SizedBox(height: 12),
-                const _VisitCard(
-                  title: '부산 불꽃축제',
-                  date: '2023.11.04',
-                  crowd: '보통',
-                  tags: [],
-                ),
+                _VisitPlansPreview(plans: visitPlans),
                 const SizedBox(height: 28),
                 const _SectionTitle(
                   icon: Icons.settings_outlined,
@@ -155,39 +158,40 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _UserCard extends StatelessWidget {
-  const _UserCard();
+  const _UserCard({required this.name});
+  final String name;
   @override
-  Widget build(BuildContext context) => const _WhiteCard(
+  Widget build(BuildContext context) => _WhiteCard(
     child: Row(
       children: [
-        CircleAvatar(
+        const CircleAvatar(
           radius: 38,
           backgroundColor: Color(0xFFFFE3DA),
           child: Icon(Icons.person_rounded, color: _brand, size: 46),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '김지수 님',
-                style: TextStyle(
+                '$name 님',
+                style: const TextStyle(
                   color: _ink,
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              SizedBox(height: 8),
-              Wrap(
+              const SizedBox(height: 8),
+              const Wrap(
                 spacing: 6,
                 children: [
                   _MiniTag('축제 매니아', Color(0xFF1359E8)),
                   _MiniTag('혼잡도 탐지기', _brand),
                 ],
               ),
-              SizedBox(height: 10),
-              LinearProgressIndicator(
+              const SizedBox(height: 10),
+              const LinearProgressIndicator(
                 value: .58,
                 minHeight: 6,
                 color: _orange,
@@ -196,8 +200,8 @@ class _UserCard extends StatelessWidget {
             ],
           ),
         ),
-        SizedBox(width: 10),
-        Icon(Icons.settings_suggest_outlined, color: Color(0xFF5F514D)),
+        const SizedBox(width: 10),
+        const Icon(Icons.settings_suggest_outlined, color: Color(0xFF5F514D)),
       ],
     ),
   );
@@ -351,10 +355,16 @@ class _StatCard extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.icon, required this.title, this.trailing});
+  const _SectionTitle({
+    required this.icon,
+    required this.title,
+    this.trailing,
+    this.onTrailingTap,
+  });
   final IconData icon;
   final String title;
   final String? trailing;
+  final VoidCallback? onTrailingTap;
   @override
   Widget build(BuildContext context) => Row(
     children: [
@@ -371,37 +381,65 @@ class _SectionTitle extends StatelessWidget {
         ),
       ),
       if (trailing != null)
-        Text(
-          trailing!,
-          style: const TextStyle(color: Color(0xFF1359E8), fontSize: 12),
+        TextButton(
+          onPressed: onTrailingTap,
+          child: Text(
+            trailing!,
+            style: const TextStyle(color: Color(0xFF1359E8), fontSize: 12),
+          ),
         ),
     ],
   );
 }
 
 class _FavoriteFestivals extends StatelessWidget {
-  const _FavoriteFestivals();
+  const _FavoriteFestivals({required this.favorites});
+
+  final AsyncValue<List<FavoritePlace>> favorites;
+
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 216,
-    child: ListView(
-      scrollDirection: Axis.horizontal,
-      children: const [
-        _FestivalTile(
-          title: '서울 세계 불꽃 축제',
-          subtitle: '10.05 ~ 10.07 | 여의도 한강공원',
-          match: '취향 98%',
-          color: Color(0xFF233D67),
+  Widget build(BuildContext context) => favorites.when(
+    loading: () => const _FavoriteEmpty(message: '관심 축제를 불러오는 중이에요.'),
+    error: (_, _) => const _FavoriteEmpty(message: '관심 축제를 불러오지 못했어요.'),
+    data: (items) {
+      if (items.isEmpty) {
+        return const _FavoriteEmpty(message: '축제 상세에서 하트를 눌러 저장해 보세요.');
+      }
+      return SizedBox(
+        height: 216,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 13),
+          itemBuilder: (context, index) {
+            final favorite = items[index];
+            return _FestivalTile(
+              title: favorite.name,
+              subtitle: '저장한 관심 축제',
+              match: '상세보기',
+              color: const Color(0xFF233D67),
+              onTap: () => context.push(AppRoutes.detail(favorite.placeId)),
+            );
+          },
         ),
-        SizedBox(width: 13),
-        _FestivalTile(
-          title: '아침고요수목원 빛축제',
-          subtitle: '12.01 ~ 03.14 | 가평',
-          match: '취향 82%',
-          color: Color(0xFF21492F),
-        ),
-      ],
+      );
+    },
+  );
+}
+
+class _FavoriteEmpty extends StatelessWidget {
+  const _FavoriteEmpty({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 110,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(13),
     ),
+    child: Text(message, style: const TextStyle(color: _muted)),
   );
 }
 
@@ -411,66 +449,165 @@ class _FestivalTile extends StatelessWidget {
     required this.subtitle,
     required this.match,
     required this.color,
+    required this.onTap,
   });
   final String title, subtitle;
   final Color color;
   final String match;
+  final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => Container(
-    width: 255,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(13),
-      boxShadow: const [BoxShadow(color: Color(0x0D000000), blurRadius: 12)],
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(13),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 125,
-            color: color,
-            child: const Center(
-              child: Icon(
-                Icons.celebration_rounded,
-                color: Colors.white,
-                size: 56,
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(13),
+    child: Container(
+      width: 255,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(13),
+        boxShadow: const [BoxShadow(color: Color(0x0D000000), blurRadius: 12)],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(13),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 125,
+              color: color,
+              child: const Center(
+                child: Icon(
+                  Icons.celebration_rounded,
+                  color: Colors.white,
+                  size: 56,
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    color: const Color(0xFFFFE8DF),
+                    child: Text(
+                      match,
+                      style: const TextStyle(
+                        color: _brand,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                  color: const Color(0xFFFFE8DF),
-                  child: Text(
-                    match,
+                  const SizedBox(height: 5),
+                  Text(
+                    title,
                     style: const TextStyle(
-                      color: _brand,
-                      fontSize: 10,
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: _muted, fontSize: 10),
                   ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _VisitPlansPreview extends StatelessWidget {
+  const _VisitPlansPreview({required this.plans});
+  final AsyncValue<List<Visit>> plans;
+
+  @override
+  Widget build(BuildContext context) => plans.when(
+    loading: () => const _FavoriteEmpty(message: '방문 일정을 불러오는 중이에요.'),
+    error: (_, _) => const _FavoriteEmpty(message: '방문 일정을 불러오지 못했어요.'),
+    data: (items) {
+      if (items.isEmpty) {
+        return const _FavoriteEmpty(message: '축제 상세에서 방문 예정일을 저장해 보세요.');
+      }
+      final sorted = [...items]
+        ..sort((a, b) => a.visitedAt.compareTo(b.visitedAt));
+      return Column(
+        children: [
+          for (var index = 0; index < sorted.take(2).length; index++) ...[
+            _VisitCard(
+              title: sorted[index].placeName,
+              date: _visitDate(sorted[index].visitedAt),
+              crowdScore: sorted[index].crowdLevel,
+              onTap: () => context.push(AppRoutes.visitPlans),
+            ),
+            if (index < sorted.take(2).length - 1) const SizedBox(height: 12),
+          ],
+        ],
+      );
+    },
+  );
+}
+
+class _VisitCard extends StatelessWidget {
+  const _VisitCard({
+    required this.title,
+    required this.date,
+    required this.crowdScore,
+    required this.onTap,
+  });
+  final String title, date;
+  final int crowdScore;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: _WhiteCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9E9E3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.history_rounded, color: _brand),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      date,
+                      style: const TextStyle(color: _muted, fontSize: 10),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 6),
                 Text(
-                  subtitle,
-                  style: const TextStyle(color: _muted, fontSize: 10),
+                  '저장 당시 예상 혼잡도: $crowdScore점',
+                  style: const TextStyle(color: _muted, fontSize: 11),
                 ),
               ],
             ),
@@ -481,108 +618,9 @@ class _FestivalTile extends StatelessWidget {
   );
 }
 
-class _HistoryTabs extends StatelessWidget {
-  const _HistoryTabs();
-  @override
-  Widget build(BuildContext context) => Container(
-    height: 44,
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(
-      color: const Color(0xFFE6E6E9),
-      borderRadius: BorderRadius.circular(24),
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          child: Container(
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              '방문 기록',
-              style: TextStyle(color: _brand, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-        const Expanded(
-          child: Center(
-            child: Text('혼잡도 제보', style: TextStyle(color: _muted)),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _VisitCard extends StatelessWidget {
-  const _VisitCard({
-    required this.title,
-    required this.date,
-    required this.crowd,
-    required this.tags,
-  });
-  final String title, date, crowd;
-  final List<String> tags;
-  @override
-  Widget build(BuildContext context) => _WhiteCard(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9E9E3),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.history_rounded, color: _brand),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    date,
-                    style: const TextStyle(color: _muted, fontSize: 10),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '방문 당시 혼잡도: $crowd',
-                style: TextStyle(
-                  color: crowd == '매우 혼잡' ? _orange : _muted,
-                  fontSize: 11,
-                ),
-              ),
-              if (tags.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  children: tags.map((tag) => _MiniTag(tag, _muted)).toList(),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
+String _visitDate(DateTime value) =>
+    '${value.year}.${value.month.toString().padLeft(2, '0')}.'
+    '${value.day.toString().padLeft(2, '0')}';
 
 class _SettingsCard extends StatelessWidget {
   const _SettingsCard({

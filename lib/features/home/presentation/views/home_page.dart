@@ -24,6 +24,8 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final homeState = ref.watch(homeViewModelProvider);
     final personality = ref.watch(personalityProvider).value;
+    final festivals = homeState.festivals?.items ?? const <FestivalSummary>[];
+    final featuredFestival = festivals.isEmpty ? null : festivals.first;
 
     final body = Stack(
       children: [
@@ -43,14 +45,20 @@ class HomePage extends ConsumerWidget {
                 ),
                 sliver: SliverList.list(
                   children: [
-                    const _SectionTitle(icon: '✦', title: '오늘의 AI 맞춤 추천'),
-                    const SizedBox(height: 16),
-                    _HeroRecommendationCard(
-                      personalityLabel: personality?.shortTitle ?? '성향 분석 중',
-                    ),
-                    const SizedBox(height: 28),
-                    const _TopFestivalsHeader(),
-                    const SizedBox(height: 14),
+                    const _SectionTitle(icon: '✦', title: '내 취향 축제 추천'),
+                    if (featuredFestival != null) ...[
+                      const SizedBox(height: 16),
+                      _HeroRecommendationCard(
+                        personalityLabel: personality?.shortTitle ?? '성향 분석 중',
+                        festival: featuredFestival,
+                        recommendationReason: homeState.recommendationReason,
+                      ),
+                      if (festivals.length > 1) ...[
+                        const SizedBox(height: 28),
+                        const _TopFestivalsHeader(),
+                        const SizedBox(height: 14),
+                      ],
+                    ],
                     if (homeState.isRefreshing && homeState.festivals == null)
                       const Center(child: CircularProgressIndicator())
                     else if (homeState.errorMessage != null)
@@ -60,16 +68,10 @@ class HomePage extends ConsumerWidget {
                             ref.read(homeViewModelProvider.notifier).refresh(),
                       )
                     else
-                      for (final festival
-                          in homeState.festivals?.items ??
-                              const <FestivalSummary>[]) ...[
+                      for (final festival in festivals.skip(1)) ...[
                         _ApiFestivalCard(festival: festival),
                         const SizedBox(height: 18),
                       ],
-                    const SizedBox(height: 24),
-                    const _RainyDayCard(),
-                    const SizedBox(height: 24),
-                    const _TimeAnalysisCard(),
                   ],
                 ),
               ),
@@ -173,9 +175,15 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _HeroRecommendationCard extends StatelessWidget {
-  const _HeroRecommendationCard({required this.personalityLabel});
+  const _HeroRecommendationCard({
+    required this.personalityLabel,
+    required this.festival,
+    required this.recommendationReason,
+  });
 
   final String personalityLabel;
+  final FestivalSummary festival;
+  final String recommendationReason;
 
   @override
   Widget build(BuildContext context) {
@@ -202,8 +210,7 @@ class _HeroRecommendationCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   _FestivalImage(
-                    url:
-                        'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=1000',
+                    url: festival.primaryImageUrl,
                     fallbackColor: const Color(0xFF153D57),
                   ),
                   const DecoratedBox(
@@ -217,6 +224,7 @@ class _HeroRecommendationCard extends StatelessWidget {
                   ),
                   Positioned(
                     left: 18,
+                    right: 18,
                     bottom: 19,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +239,7 @@ class _HeroRecommendationCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: const Text(
-                            'BEST MATCH',
+                            '취향 추천',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -240,9 +248,11 @@ class _HeroRecommendationCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          '2026 부산 빛 축제',
-                          style: TextStyle(
+                        Text(
+                          festival.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.w600,
@@ -266,22 +276,26 @@ class _HeroRecommendationCard extends StatelessWidget {
                         value: personalityLabel,
                         iconColor: _brand,
                       );
-                      const weather = _InsightChip(
-                        icon: Icons.wb_sunny_outlined,
-                        label: '현재 날씨',
-                        value: '맑고 선선함',
-                        iconColor: Color(0xFF0958FF),
+                      final category = _InsightChip(
+                        icon: Icons.category_outlined,
+                        label: '축제 유형',
+                        value: _categoryLabel(festival.category),
+                        iconColor: const Color(0xFF0958FF),
                       );
-                      if (constraints.maxWidth < 300) {
+                      if (constraints.maxWidth < 360) {
                         return Column(
-                          children: [preference, SizedBox(height: 10), weather],
+                          children: [
+                            preference,
+                            const SizedBox(height: 10),
+                            category,
+                          ],
                         );
                       }
                       return Row(
                         children: [
                           Expanded(child: preference),
                           const SizedBox(width: 12),
-                          const Expanded(child: weather),
+                          Expanded(child: category),
                         ],
                       );
                     },
@@ -295,32 +309,28 @@ class _HeroRecommendationCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(17),
                       border: Border.all(color: const Color(0xFFFFC8B5)),
                     ),
-                    child: const Text.rich(
+                    child: Text.rich(
                       TextSpan(
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Color(0xFF87341E),
                           height: 1.65,
                           fontSize: 14,
                         ),
                         children: [
-                          TextSpan(
-                            text: 'AI 분석: ',
+                          const TextSpan(
+                            text: '추천 이유: ',
                             style: TextStyle(fontWeight: FontWeight.w800),
                           ),
-                          TextSpan(
-                            text:
-                                '현재 여유로운 혼잡도와 맑은 하늘, '
-                                '사용자가 선호하는 한적한 분위기가 완벽하게 '
-                                '조화를 이루는 최고의 방문 타이밍입니다.',
-                          ),
+                          TextSpan(text: recommendationReason),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 17),
                   _PrimaryButton(
-                    label: '실시간 혼잡도 리포트 보기',
-                    onTap: () => context.push(AppRoutes.detail('busan-light')),
+                    label: '축제 상세 및 혼잡도 보기',
+                    onTap: () =>
+                        context.push(AppRoutes.detail(festival.id.toString())),
                   ),
                 ],
               ),
@@ -410,6 +420,8 @@ class _PrimaryButton extends StatelessWidget {
         ),
         child: Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 16,
@@ -426,18 +438,21 @@ class _TopFestivalsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          '맞춤 추천 TOP 3',
+        const Text(
+          '다른 추천 축제',
           style: TextStyle(
             color: _ink,
             fontSize: 18,
             fontWeight: FontWeight.w700,
           ),
         ),
-        Text('전체보기 ›', style: TextStyle(color: _brand, fontSize: 14)),
+        TextButton(
+          onPressed: () => context.push(AppRoutes.festivals),
+          child: const Text('전체보기 ›'),
+        ),
       ],
     );
   }
@@ -536,6 +551,15 @@ class _ApiErrorCard extends StatelessWidget {
 }
 
 String _shortDate(DateTime date) => '${date.month}.${date.day}';
+
+String _categoryLabel(FestivalCategory category) => switch (category) {
+  FestivalCategory.culture => '문화',
+  FestivalCategory.nature => '자연',
+  FestivalCategory.food => '먹거리',
+  FestivalCategory.performance => '공연',
+  FestivalCategory.tradition => '전통',
+  FestivalCategory.other => '기타',
+};
 
 // Kept for the richer recommendation response planned by the API contract.
 // ignore: unused_element
@@ -715,6 +739,8 @@ class _MetricDivider extends StatelessWidget {
   }
 }
 
+// Reserved until weather and indoor-place APIs are available.
+// ignore: unused_element
 class _RainyDayCard extends StatelessWidget {
   const _RainyDayCard();
 
@@ -819,6 +845,8 @@ class _IndoorPlaceTile extends StatelessWidget {
   }
 }
 
+// Reserved until a home-level time analysis API is available.
+// ignore: unused_element
 class _TimeAnalysisCard extends StatelessWidget {
   const _TimeAnalysisCard();
 
@@ -912,7 +940,7 @@ class _SearchButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.go(AppRoutes.map),
+      onTap: () => context.push(AppRoutes.festivals),
       child: Container(
         width: 58,
         height: 58,

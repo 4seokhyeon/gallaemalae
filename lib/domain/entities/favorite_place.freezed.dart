@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$FavoritePlace {
 
- String get placeId; String get name; double get latitude; double get longitude; DateTime get createdAt;
+ String get placeId; String get name; double get latitude; double get longitude; DateTime get createdAt; String? get categoryCode;
 /// Create a copy of FavoritePlace
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +25,16 @@ $FavoritePlaceCopyWith<FavoritePlace> get copyWith => _$FavoritePlaceCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is FavoritePlace&&(identical(other.placeId, placeId) || other.placeId == placeId)&&(identical(other.name, name) || other.name == name)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FavoritePlace&&(identical(other.placeId, placeId) || other.placeId == placeId)&&(identical(other.name, name) || other.name == name)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.categoryCode, categoryCode) || other.categoryCode == categoryCode));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,placeId,name,latitude,longitude,createdAt);
+int get hashCode => Object.hash(runtimeType,placeId,name,latitude,longitude,createdAt,categoryCode);
 
 @override
 String toString() {
-  return 'FavoritePlace(placeId: $placeId, name: $name, latitude: $latitude, longitude: $longitude, createdAt: $createdAt)';
+  return 'FavoritePlace(placeId: $placeId, name: $name, latitude: $latitude, longitude: $longitude, createdAt: $createdAt, categoryCode: $categoryCode)';
 }
 
 
@@ -45,7 +45,7 @@ abstract mixin class $FavoritePlaceCopyWith<$Res>  {
   factory $FavoritePlaceCopyWith(FavoritePlace value, $Res Function(FavoritePlace) _then) = _$FavoritePlaceCopyWithImpl;
 @useResult
 $Res call({
- String placeId, String name, double latitude, double longitude, DateTime createdAt
+ String placeId, String name, double latitude, double longitude, DateTime createdAt, String? categoryCode
 });
 
 
@@ -62,14 +62,15 @@ class _$FavoritePlaceCopyWithImpl<$Res>
 
 /// Create a copy of FavoritePlace
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? placeId = null,Object? name = null,Object? latitude = null,Object? longitude = null,Object? createdAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? placeId = null,Object? name = null,Object? latitude = null,Object? longitude = null,Object? createdAt = null,Object? categoryCode = freezed,}) {
   return _then(_self.copyWith(
 placeId: null == placeId ? _self.placeId : placeId // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,latitude: null == latitude ? _self.latitude : latitude // ignore: cast_nullable_to_non_nullable
 as double,longitude: null == longitude ? _self.longitude : longitude // ignore: cast_nullable_to_non_nullable
 as double,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as DateTime,
+as DateTime,categoryCode: freezed == categoryCode ? _self.categoryCode : categoryCode // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -154,10 +155,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String placeId,  String name,  double latitude,  double longitude,  DateTime createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String placeId,  String name,  double latitude,  double longitude,  DateTime createdAt,  String? categoryCode)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _FavoritePlace() when $default != null:
-return $default(_that.placeId,_that.name,_that.latitude,_that.longitude,_that.createdAt);case _:
+return $default(_that.placeId,_that.name,_that.latitude,_that.longitude,_that.createdAt,_that.categoryCode);case _:
   return orElse();
 
 }
@@ -175,10 +176,10 @@ return $default(_that.placeId,_that.name,_that.latitude,_that.longitude,_that.cr
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String placeId,  String name,  double latitude,  double longitude,  DateTime createdAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String placeId,  String name,  double latitude,  double longitude,  DateTime createdAt,  String? categoryCode)  $default,) {final _that = this;
 switch (_that) {
 case _FavoritePlace():
-return $default(_that.placeId,_that.name,_that.latitude,_that.longitude,_that.createdAt);case _:
+return $default(_that.placeId,_that.name,_that.latitude,_that.longitude,_that.createdAt,_that.categoryCode);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -195,10 +196,10 @@ return $default(_that.placeId,_that.name,_that.latitude,_that.longitude,_that.cr
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String placeId,  String name,  double latitude,  double longitude,  DateTime createdAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String placeId,  String name,  double latitude,  double longitude,  DateTime createdAt,  String? categoryCode)?  $default,) {final _that = this;
 switch (_that) {
 case _FavoritePlace() when $default != null:
-return $default(_that.placeId,_that.name,_that.latitude,_that.longitude,_that.createdAt);case _:
+return $default(_that.placeId,_that.name,_that.latitude,_that.longitude,_that.createdAt,_that.categoryCode);case _:
   return null;
 
 }
@@ -210,7 +211,7 @@ return $default(_that.placeId,_that.name,_that.latitude,_that.longitude,_that.cr
 
 
 class _FavoritePlace implements FavoritePlace {
-  const _FavoritePlace({required this.placeId, required this.name, required this.latitude, required this.longitude, required this.createdAt});
+  const _FavoritePlace({required this.placeId, required this.name, required this.latitude, required this.longitude, required this.createdAt, this.categoryCode});
   
 
 @override final  String placeId;
@@ -218,6 +219,7 @@ class _FavoritePlace implements FavoritePlace {
 @override final  double latitude;
 @override final  double longitude;
 @override final  DateTime createdAt;
+@override final  String? categoryCode;
 
 /// Create a copy of FavoritePlace
 /// with the given fields replaced by the non-null parameter values.
@@ -229,16 +231,16 @@ _$FavoritePlaceCopyWith<_FavoritePlace> get copyWith => __$FavoritePlaceCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FavoritePlace&&(identical(other.placeId, placeId) || other.placeId == placeId)&&(identical(other.name, name) || other.name == name)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FavoritePlace&&(identical(other.placeId, placeId) || other.placeId == placeId)&&(identical(other.name, name) || other.name == name)&&(identical(other.latitude, latitude) || other.latitude == latitude)&&(identical(other.longitude, longitude) || other.longitude == longitude)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.categoryCode, categoryCode) || other.categoryCode == categoryCode));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,placeId,name,latitude,longitude,createdAt);
+int get hashCode => Object.hash(runtimeType,placeId,name,latitude,longitude,createdAt,categoryCode);
 
 @override
 String toString() {
-  return 'FavoritePlace(placeId: $placeId, name: $name, latitude: $latitude, longitude: $longitude, createdAt: $createdAt)';
+  return 'FavoritePlace(placeId: $placeId, name: $name, latitude: $latitude, longitude: $longitude, createdAt: $createdAt, categoryCode: $categoryCode)';
 }
 
 
@@ -249,7 +251,7 @@ abstract mixin class _$FavoritePlaceCopyWith<$Res> implements $FavoritePlaceCopy
   factory _$FavoritePlaceCopyWith(_FavoritePlace value, $Res Function(_FavoritePlace) _then) = __$FavoritePlaceCopyWithImpl;
 @override @useResult
 $Res call({
- String placeId, String name, double latitude, double longitude, DateTime createdAt
+ String placeId, String name, double latitude, double longitude, DateTime createdAt, String? categoryCode
 });
 
 
@@ -266,14 +268,15 @@ class __$FavoritePlaceCopyWithImpl<$Res>
 
 /// Create a copy of FavoritePlace
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? placeId = null,Object? name = null,Object? latitude = null,Object? longitude = null,Object? createdAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? placeId = null,Object? name = null,Object? latitude = null,Object? longitude = null,Object? createdAt = null,Object? categoryCode = freezed,}) {
   return _then(_FavoritePlace(
 placeId: null == placeId ? _self.placeId : placeId // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,latitude: null == latitude ? _self.latitude : latitude // ignore: cast_nullable_to_non_nullable
 as double,longitude: null == longitude ? _self.longitude : longitude // ignore: cast_nullable_to_non_nullable
 as double,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as DateTime,
+as DateTime,categoryCode: freezed == categoryCode ? _self.categoryCode : categoryCode // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 

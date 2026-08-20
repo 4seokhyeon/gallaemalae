@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +10,7 @@ import 'package:gallaemalae/core/layout/app_layout.dart';
 import 'package:gallaemalae/core/router/app_routes.dart';
 import 'package:gallaemalae/data/repositories/repository_providers.dart';
 import 'package:gallaemalae/domain/entities/geo_point.dart';
+import 'package:gallaemalae/domain/entities/festival.dart';
 import 'package:gallaemalae/features/map/presentation/view_models/map_view_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -179,18 +182,69 @@ class _MapPageState extends ConsumerState<MapPage> {
 
   void _handleMapReady(NaverMapController controller) {
     _mapController = controller;
+    unawaited(
+      _syncFestivalMarkers(
+        controller,
+        ref.read(mapViewModelProvider).visibleFestivals,
+      ),
+    );
     if (_wasMapRouteActive) _moveToCurrentLocation();
+  }
+
+  Future<void> _syncFestivalMarkers(
+    NaverMapController controller,
+    List<FestivalSummary> festivals,
+  ) async {
+    if (!identical(_mapController, controller)) return;
+    try {
+      await controller.clearOverlays(type: NOverlayType.marker);
+      if (!identical(_mapController, controller)) return;
+      final markers = festivals
+          .where(
+            (festival) =>
+                festival.latitude >= -90 &&
+                festival.latitude <= 90 &&
+                festival.longitude >= -180 &&
+                festival.longitude <= 180,
+          )
+          .map(
+            (festival) =>
+                NMarker(
+                  id: 'festival_${festival.id}',
+                  position: NLatLng(festival.latitude, festival.longitude),
+                  iconTintColor: _markerColor(festival.category),
+                  caption: NOverlayCaption(text: festival.title),
+                )..setOnTapListener((_) {
+                  ref
+                      .read(mapViewModelProvider.notifier)
+                      .selectFestival(festival.id);
+                }),
+          )
+          .toSet();
+      if (markers.isNotEmpty) await controller.addOverlayAll(markers);
+    } on MissingPluginException {
+      // PlatformView가 정리된 뒤 도착한 비동기 결과는 무시합니다.
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(mapViewModelProvider);
     final viewModel = ref.read(mapViewModelProvider.notifier);
+    ref.listen<List<FestivalSummary>>(
+      mapViewModelProvider.select((value) => value.visibleFestivals),
+      (_, festivals) {
+        final controller = _mapController;
+        if (controller != null) {
+          unawaited(_syncFestivalMarkers(controller, festivals));
+        }
+      },
+    );
     final horizontalPadding = AppLayout.horizontalPadding(context);
     final navigationInset = AppLayout.navigationOverlayInset(context);
     final cardBottom = navigationInset + 12;
     final hideMapControls =
-        state.selectedPlaceId != null && AppLayout.isCompactHeight(context);
+        state.selectedFestivalId != null && AppLayout.isCompactHeight(context);
 
     return ColoredBox(
       color: const Color(0xFFE8EFEA),
@@ -200,10 +254,9 @@ class _MapPageState extends ConsumerState<MapPage> {
           children: [
             Positioned.fill(
               child: _NaverCrowdMap(
-                isCardVisible: state.selectedPlaceId != null,
+                isCardVisible: state.selectedFestivalId != null,
                 onMapReady: _handleMapReady,
-                onMarkerTapped: viewModel.selectPlace,
-                onMapTapped: viewModel.clearSelectedPlace,
+                onMapTapped: viewModel.clearSelectedFestival,
               ),
             ),
             const Align(alignment: Alignment.topCenter, child: _MapHeader()),
@@ -229,12 +282,29 @@ class _MapPageState extends ConsumerState<MapPage> {
                 right: 0,
                 child: _LocatingIndicator(),
               ),
+            if (state.isLoading)
+              const Positioned(
+                top: 174,
+                left: 0,
+                right: 0,
+                child: _FestivalLoadingIndicator(),
+              ),
+            if (state.errorMessage != null)
+              Positioned(
+                top: 174,
+                left: horizontalPadding,
+                right: horizontalPadding,
+                child: _MapErrorBanner(
+                  message: state.errorMessage!,
+                  onRetry: viewModel.loadFestivals,
+                ),
+              ),
             if (!hideMapControls)
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
                 right: horizontalPadding,
-                bottom: state.selectedPlaceId == null
+                bottom: state.selectedFestivalId == null
                     ? navigationInset + 18
                     : cardBottom + 300,
                 child: Column(
@@ -248,15 +318,17 @@ class _MapPageState extends ConsumerState<MapPage> {
                   ],
                 ),
               ),
-            if (state.selectedPlaceId != null)
+            if (state.selectedFestival != null)
               Positioned(
                 left: horizontalPadding,
                 right: horizontalPadding,
                 bottom: cardBottom,
                 child: _FestivalPredictionCard(
-                  onClose: viewModel.clearSelectedPlace,
-                  onTap: () =>
-                      context.push(AppRoutes.detail(state.selectedPlaceId!)),
+                  festival: state.selectedFestival!,
+                  onClose: viewModel.clearSelectedFestival,
+                  onTap: () => context.push(
+                    AppRoutes.detail(state.selectedFestivalId!.toString()),
+                  ),
                 ),
               ),
           ],
@@ -270,13 +342,11 @@ class _NaverCrowdMap extends StatelessWidget {
   const _NaverCrowdMap({
     required this.isCardVisible,
     required this.onMapReady,
-    required this.onMarkerTapped,
     required this.onMapTapped,
   });
 
   final bool isCardVisible;
   final ValueChanged<NaverMapController> onMapReady;
-  final ValueChanged<String> onMarkerTapped;
   final VoidCallback onMapTapped;
 
   static const _yeouido = NLatLng(37.5283, 126.9326);
@@ -306,61 +376,7 @@ class _NaverCrowdMap extends StatelessWidget {
         logoMargin: EdgeInsets.only(left: 8, bottom: logoBottom),
       ),
       onMapTapped: (point, position) => onMapTapped(),
-      onMapReady: (controller) async {
-        onMapReady(controller);
-        final festivalMarker =
-            NMarker(
-              id: 'hangang_fireworks',
-              position: _yeouido,
-              iconTintColor: const Color(0xFFD21F24),
-              caption: const NOverlayCaption(text: '매우 혼잡'),
-            )..setOnTapListener((marker) {
-              onMarkerTapped('hangang-fireworks');
-            });
-        final gangnamMarker =
-            NMarker(
-              id: 'gangnam_normal',
-              position: const NLatLng(37.4979, 127.0276),
-              iconTintColor: const Color(0xFFFF6838),
-              caption: const NOverlayCaption(text: '보통'),
-            )..setOnTapListener((marker) {
-              onMarkerTapped('gangnam-normal');
-            });
-
-        final overlays = <NAddableOverlay>{
-          NCircleOverlay(
-            id: 'crowd_hot_yeouido',
-            center: _yeouido,
-            radius: 3100,
-            color: const Color(0x60E83027),
-            outlineColor: Colors.transparent,
-          ),
-          NCircleOverlay(
-            id: 'crowd_hot_jongno',
-            center: const NLatLng(37.5729, 126.9794),
-            radius: 1900,
-            color: const Color(0x54F15A2A),
-            outlineColor: Colors.transparent,
-          ),
-          NCircleOverlay(
-            id: 'crowd_normal_gangnam',
-            center: const NLatLng(37.4979, 127.0276),
-            radius: 2600,
-            color: const Color(0x52FF7B36),
-            outlineColor: Colors.transparent,
-          ),
-          NCircleOverlay(
-            id: 'crowd_relaxed_mapo',
-            center: const NLatLng(37.5563, 126.9220),
-            radius: 1500,
-            color: const Color(0x4939C79B),
-            outlineColor: Colors.transparent,
-          ),
-          festivalMarker,
-          gangnamMarker,
-        };
-        await controller.addOverlayAll(overlays);
-      },
+      onMapReady: onMapReady,
     );
   }
 }
@@ -506,8 +522,8 @@ class _SearchBar extends StatelessWidget {
 class _FilterChips extends StatelessWidget {
   const _FilterChips({required this.selected, required this.onSelected});
 
-  final CrowdFilter selected;
-  final ValueChanged<CrowdFilter> onSelected;
+  final FestivalMapFilter selected;
+  final ValueChanged<FestivalMapFilter> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -515,10 +531,10 @@ class _FilterChips extends StatelessWidget {
       height: 38,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: CrowdFilter.values.length,
+        itemCount: FestivalMapFilter.values.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
-          final filter = CrowdFilter.values[index];
+          final filter = FestivalMapFilter.values[index];
           final isSelected = selected == filter;
           return GestureDetector(
             onTap: () => onSelected(filter),
@@ -608,28 +624,76 @@ class _LocatingIndicator extends StatelessWidget {
   }
 }
 
-class _FestivalPredictionCard extends StatelessWidget {
-  const _FestivalPredictionCard({required this.onClose, required this.onTap});
+class _FestivalLoadingIndicator extends StatelessWidget {
+  const _FestivalLoadingIndicator();
 
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.all(Radius.circular(20)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CupertinoActivityIndicator(color: _brand),
+            SizedBox(width: 9),
+            Text('축제 불러오는 중…', style: TextStyle(fontSize: 13)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _MapErrorBanner extends StatelessWidget {
+  const _MapErrorBanner({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 10)],
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.error_outline_rounded, color: _brand),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            message,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12),
+          ),
+        ),
+        TextButton(onPressed: onRetry, child: const Text('재시도')),
+      ],
+    ),
+  );
+}
+
+class _FestivalPredictionCard extends StatelessWidget {
+  const _FestivalPredictionCard({
+    required this.festival,
+    required this.onClose,
+    required this.onTap,
+  });
+
+  final FestivalSummary festival;
   final VoidCallback onClose;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    const bars = [
-      10.0,
-      15.0,
-      20.0,
-      29.0,
-      34.0,
-      43.0,
-      47.0,
-      41.0,
-      31.0,
-      24.0,
-      14.0,
-      9.0,
-    ];
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
@@ -653,65 +717,36 @@ class _FestivalPredictionCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
-                      children: [
-                        Text(
-                          'MUSIC FESTIVAL',
-                          style: TextStyle(
-                            color: Color(0xFF1765E5),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Icon(Icons.schedule, size: 15, color: _muted),
-                        SizedBox(width: 3),
-                        Text(
-                          '14:00 - 22:00',
-                          style: TextStyle(color: _muted, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 7),
                     Text(
-                      '2024 한강 불꽃 축제',
-                      style: TextStyle(
+                      _categoryLabel(festival.category),
+                      style: const TextStyle(
+                        color: Color(0xFF1765E5),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      festival.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
                         color: _ink,
                         fontSize: 19,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     Text(
-                      '여의도 한강공원 일대 · 2.4km 거리',
-                      style: TextStyle(color: _muted, fontSize: 13),
+                      festival.address,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: _muted, fontSize: 13),
                     ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFEBEB),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFFC1C1)),
-                ),
-                child: const Column(
-                  children: [
+                    const SizedBox(height: 4),
                     Text(
-                      '88%',
-                      style: TextStyle(
-                        color: Color(0xFFD51F27),
-                        fontSize: 25,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      '매우 혼잡',
-                      style: TextStyle(color: Color(0xFFD51F27), fontSize: 10),
+                      '${_date(festival.startDate)} – ${_date(festival.endDate)}',
+                      style: const TextStyle(color: _brand, fontSize: 12),
                     ),
                   ],
                 ),
@@ -727,53 +762,9 @@ class _FestivalPredictionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 17),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('시간별 혼잡도 예측', style: TextStyle(color: _muted, fontSize: 12)),
-              Text(
-                '19:00 최고 혼잡',
-                style: TextStyle(color: _brand, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 51,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (var index = 0; index < bars.length; index++)
-                  Expanded(
-                    child: Container(
-                      height: bars[index],
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: index < 3
-                            ? const Color(0xFF43C6A2)
-                            : index < 8
-                            ? const Color(0xFFFF5C35)
-                            : const Color(0xFFFF916F),
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(3),
-                        ),
-                        border: index == 6
-                            ? Border.all(color: _brandDark, width: 2)
-                            : null,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 5),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('12:00', style: TextStyle(color: _muted, fontSize: 9)),
-              Text('NOW', style: TextStyle(color: _ink, fontSize: 9)),
-              Text('24:00', style: TextStyle(color: _muted, fontSize: 9)),
-            ],
+          const Text(
+            '방문 날짜를 선택하면 시간대별 예상 혼잡도를 확인할 수 있어요.',
+            style: TextStyle(color: _muted, fontSize: 13, height: 1.4),
           ),
           const SizedBox(height: 17),
           GestureDetector(
@@ -791,7 +782,7 @@ class _FestivalPredictionCard extends StatelessWidget {
                   Icon(Icons.insights_rounded, color: Colors.white),
                   SizedBox(width: 9),
                   Text(
-                    '상세 예측 및 대안 보기',
+                    '상세 정보 및 혼잡도 분석',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -807,3 +798,25 @@ class _FestivalPredictionCard extends StatelessWidget {
     );
   }
 }
+
+Color _markerColor(FestivalCategory category) => switch (category) {
+  FestivalCategory.culture => const Color(0xFF6C4ED9),
+  FestivalCategory.nature => const Color(0xFF098966),
+  FestivalCategory.food => const Color(0xFFFF6838),
+  FestivalCategory.performance => const Color(0xFFD21F54),
+  FestivalCategory.tradition => const Color(0xFF9A6427),
+  FestivalCategory.other => const Color(0xFF4E5968),
+};
+
+String _categoryLabel(FestivalCategory category) => switch (category) {
+  FestivalCategory.culture => '문화',
+  FestivalCategory.nature => '자연',
+  FestivalCategory.food => '먹거리',
+  FestivalCategory.performance => '공연',
+  FestivalCategory.tradition => '전통',
+  FestivalCategory.other => '기타',
+};
+
+String _date(DateTime value) =>
+    '${value.year}.${value.month.toString().padLeft(2, '0')}.'
+    '${value.day.toString().padLeft(2, '0')}';

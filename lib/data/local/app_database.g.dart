@@ -416,6 +416,17 @@ class $FavoritePlacesTable extends FavoritePlaces
     type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _categoryCodeMeta = const VerificationMeta(
+    'categoryCode',
+  );
+  @override
+  late final GeneratedColumn<String> categoryCode = GeneratedColumn<String>(
+    'category_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -434,6 +445,7 @@ class $FavoritePlacesTable extends FavoritePlaces
     name,
     latitude,
     longitude,
+    categoryCode,
     createdAt,
   ];
   @override
@@ -480,6 +492,15 @@ class $FavoritePlacesTable extends FavoritePlaces
     } else if (isInserting) {
       context.missing(_longitudeMeta);
     }
+    if (data.containsKey('category_code')) {
+      context.handle(
+        _categoryCodeMeta,
+        categoryCode.isAcceptableOrUnknown(
+          data['category_code']!,
+          _categoryCodeMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -511,6 +532,10 @@ class $FavoritePlacesTable extends FavoritePlaces
         DriftSqlType.double,
         data['${effectivePrefix}longitude'],
       )!,
+      categoryCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category_code'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -529,12 +554,14 @@ class FavoritePlace extends DataClass implements Insertable<FavoritePlace> {
   final String name;
   final double latitude;
   final double longitude;
+  final String? categoryCode;
   final DateTime createdAt;
   const FavoritePlace({
     required this.placeId,
     required this.name,
     required this.latitude,
     required this.longitude,
+    this.categoryCode,
     required this.createdAt,
   });
   @override
@@ -544,6 +571,9 @@ class FavoritePlace extends DataClass implements Insertable<FavoritePlace> {
     map['name'] = Variable<String>(name);
     map['latitude'] = Variable<double>(latitude);
     map['longitude'] = Variable<double>(longitude);
+    if (!nullToAbsent || categoryCode != null) {
+      map['category_code'] = Variable<String>(categoryCode);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -554,6 +584,9 @@ class FavoritePlace extends DataClass implements Insertable<FavoritePlace> {
       name: Value(name),
       latitude: Value(latitude),
       longitude: Value(longitude),
+      categoryCode: categoryCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryCode),
       createdAt: Value(createdAt),
     );
   }
@@ -568,6 +601,7 @@ class FavoritePlace extends DataClass implements Insertable<FavoritePlace> {
       name: serializer.fromJson<String>(json['name']),
       latitude: serializer.fromJson<double>(json['latitude']),
       longitude: serializer.fromJson<double>(json['longitude']),
+      categoryCode: serializer.fromJson<String?>(json['categoryCode']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -579,6 +613,7 @@ class FavoritePlace extends DataClass implements Insertable<FavoritePlace> {
       'name': serializer.toJson<String>(name),
       'latitude': serializer.toJson<double>(latitude),
       'longitude': serializer.toJson<double>(longitude),
+      'categoryCode': serializer.toJson<String?>(categoryCode),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -588,12 +623,14 @@ class FavoritePlace extends DataClass implements Insertable<FavoritePlace> {
     String? name,
     double? latitude,
     double? longitude,
+    Value<String?> categoryCode = const Value.absent(),
     DateTime? createdAt,
   }) => FavoritePlace(
     placeId: placeId ?? this.placeId,
     name: name ?? this.name,
     latitude: latitude ?? this.latitude,
     longitude: longitude ?? this.longitude,
+    categoryCode: categoryCode.present ? categoryCode.value : this.categoryCode,
     createdAt: createdAt ?? this.createdAt,
   );
   FavoritePlace copyWithCompanion(FavoritePlacesCompanion data) {
@@ -602,6 +639,9 @@ class FavoritePlace extends DataClass implements Insertable<FavoritePlace> {
       name: data.name.present ? data.name.value : this.name,
       latitude: data.latitude.present ? data.latitude.value : this.latitude,
       longitude: data.longitude.present ? data.longitude.value : this.longitude,
+      categoryCode: data.categoryCode.present
+          ? data.categoryCode.value
+          : this.categoryCode,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -613,6 +653,7 @@ class FavoritePlace extends DataClass implements Insertable<FavoritePlace> {
           ..write('name: $name, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
+          ..write('categoryCode: $categoryCode, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -620,7 +661,7 @@ class FavoritePlace extends DataClass implements Insertable<FavoritePlace> {
 
   @override
   int get hashCode =>
-      Object.hash(placeId, name, latitude, longitude, createdAt);
+      Object.hash(placeId, name, latitude, longitude, categoryCode, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -629,6 +670,7 @@ class FavoritePlace extends DataClass implements Insertable<FavoritePlace> {
           other.name == this.name &&
           other.latitude == this.latitude &&
           other.longitude == this.longitude &&
+          other.categoryCode == this.categoryCode &&
           other.createdAt == this.createdAt);
 }
 
@@ -637,6 +679,7 @@ class FavoritePlacesCompanion extends UpdateCompanion<FavoritePlace> {
   final Value<String> name;
   final Value<double> latitude;
   final Value<double> longitude;
+  final Value<String?> categoryCode;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const FavoritePlacesCompanion({
@@ -644,6 +687,7 @@ class FavoritePlacesCompanion extends UpdateCompanion<FavoritePlace> {
     this.name = const Value.absent(),
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
+    this.categoryCode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -652,6 +696,7 @@ class FavoritePlacesCompanion extends UpdateCompanion<FavoritePlace> {
     required String name,
     required double latitude,
     required double longitude,
+    this.categoryCode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : placeId = Value(placeId),
@@ -663,6 +708,7 @@ class FavoritePlacesCompanion extends UpdateCompanion<FavoritePlace> {
     Expression<String>? name,
     Expression<double>? latitude,
     Expression<double>? longitude,
+    Expression<String>? categoryCode,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -671,6 +717,7 @@ class FavoritePlacesCompanion extends UpdateCompanion<FavoritePlace> {
       if (name != null) 'name': name,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
+      if (categoryCode != null) 'category_code': categoryCode,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -681,6 +728,7 @@ class FavoritePlacesCompanion extends UpdateCompanion<FavoritePlace> {
     Value<String>? name,
     Value<double>? latitude,
     Value<double>? longitude,
+    Value<String?>? categoryCode,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -689,6 +737,7 @@ class FavoritePlacesCompanion extends UpdateCompanion<FavoritePlace> {
       name: name ?? this.name,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      categoryCode: categoryCode ?? this.categoryCode,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -709,6 +758,9 @@ class FavoritePlacesCompanion extends UpdateCompanion<FavoritePlace> {
     if (longitude.present) {
       map['longitude'] = Variable<double>(longitude.value);
     }
+    if (categoryCode.present) {
+      map['category_code'] = Variable<String>(categoryCode.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -725,6 +777,7 @@ class FavoritePlacesCompanion extends UpdateCompanion<FavoritePlace> {
           ..write('name: $name, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
+          ..write('categoryCode: $categoryCode, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -992,12 +1045,285 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   }
 }
 
+class $FestivalCacheEntriesTable extends FestivalCacheEntries
+    with TableInfo<$FestivalCacheEntriesTable, FestivalCacheEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FestivalCacheEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _cacheKeyMeta = const VerificationMeta(
+    'cacheKey',
+  );
+  @override
+  late final GeneratedColumn<String> cacheKey = GeneratedColumn<String>(
+    'cache_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [cacheKey, payload, cachedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'festival_cache_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FestivalCacheEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('cache_key')) {
+      context.handle(
+        _cacheKeyMeta,
+        cacheKey.isAcceptableOrUnknown(data['cache_key']!, _cacheKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cacheKeyMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {cacheKey};
+  @override
+  FestivalCacheEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FestivalCacheEntry(
+      cacheKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cache_key'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $FestivalCacheEntriesTable createAlias(String alias) {
+    return $FestivalCacheEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class FestivalCacheEntry extends DataClass
+    implements Insertable<FestivalCacheEntry> {
+  final String cacheKey;
+  final String payload;
+  final DateTime cachedAt;
+  const FestivalCacheEntry({
+    required this.cacheKey,
+    required this.payload,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['cache_key'] = Variable<String>(cacheKey);
+    map['payload'] = Variable<String>(payload);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  FestivalCacheEntriesCompanion toCompanion(bool nullToAbsent) {
+    return FestivalCacheEntriesCompanion(
+      cacheKey: Value(cacheKey),
+      payload: Value(payload),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory FestivalCacheEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FestivalCacheEntry(
+      cacheKey: serializer.fromJson<String>(json['cacheKey']),
+      payload: serializer.fromJson<String>(json['payload']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'cacheKey': serializer.toJson<String>(cacheKey),
+      'payload': serializer.toJson<String>(payload),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  FestivalCacheEntry copyWith({
+    String? cacheKey,
+    String? payload,
+    DateTime? cachedAt,
+  }) => FestivalCacheEntry(
+    cacheKey: cacheKey ?? this.cacheKey,
+    payload: payload ?? this.payload,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  FestivalCacheEntry copyWithCompanion(FestivalCacheEntriesCompanion data) {
+    return FestivalCacheEntry(
+      cacheKey: data.cacheKey.present ? data.cacheKey.value : this.cacheKey,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FestivalCacheEntry(')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('payload: $payload, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(cacheKey, payload, cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FestivalCacheEntry &&
+          other.cacheKey == this.cacheKey &&
+          other.payload == this.payload &&
+          other.cachedAt == this.cachedAt);
+}
+
+class FestivalCacheEntriesCompanion
+    extends UpdateCompanion<FestivalCacheEntry> {
+  final Value<String> cacheKey;
+  final Value<String> payload;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const FestivalCacheEntriesCompanion({
+    this.cacheKey = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FestivalCacheEntriesCompanion.insert({
+    required String cacheKey,
+    required String payload,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : cacheKey = Value(cacheKey),
+       payload = Value(payload),
+       cachedAt = Value(cachedAt);
+  static Insertable<FestivalCacheEntry> custom({
+    Expression<String>? cacheKey,
+    Expression<String>? payload,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (cacheKey != null) 'cache_key': cacheKey,
+      if (payload != null) 'payload': payload,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FestivalCacheEntriesCompanion copyWith({
+    Value<String>? cacheKey,
+    Value<String>? payload,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return FestivalCacheEntriesCompanion(
+      cacheKey: cacheKey ?? this.cacheKey,
+      payload: payload ?? this.payload,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (cacheKey.present) {
+      map['cache_key'] = Variable<String>(cacheKey.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FestivalCacheEntriesCompanion(')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('payload: $payload, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $VisitRecordsTable visitRecords = $VisitRecordsTable(this);
   late final $FavoritePlacesTable favoritePlaces = $FavoritePlacesTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $FestivalCacheEntriesTable festivalCacheEntries =
+      $FestivalCacheEntriesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1006,6 +1332,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     visitRecords,
     favoritePlaces,
     appSettings,
+    festivalCacheEntries,
   ];
 }
 
@@ -1217,6 +1544,7 @@ typedef $$FavoritePlacesTableCreateCompanionBuilder =
       required String name,
       required double latitude,
       required double longitude,
+      Value<String?> categoryCode,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -1226,6 +1554,7 @@ typedef $$FavoritePlacesTableUpdateCompanionBuilder =
       Value<String> name,
       Value<double> latitude,
       Value<double> longitude,
+      Value<String?> categoryCode,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -1256,6 +1585,11 @@ class $$FavoritePlacesTableFilterComposer
 
   ColumnFilters<double> get longitude => $composableBuilder(
     column: $table.longitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get categoryCode => $composableBuilder(
+    column: $table.categoryCode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1294,6 +1628,11 @@ class $$FavoritePlacesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get categoryCode => $composableBuilder(
+    column: $table.categoryCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -1320,6 +1659,11 @@ class $$FavoritePlacesTableAnnotationComposer
 
   GeneratedColumn<double> get longitude =>
       $composableBuilder(column: $table.longitude, builder: (column) => column);
+
+  GeneratedColumn<String> get categoryCode => $composableBuilder(
+    column: $table.categoryCode,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1362,6 +1706,7 @@ class $$FavoritePlacesTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<double> latitude = const Value.absent(),
                 Value<double> longitude = const Value.absent(),
+                Value<String?> categoryCode = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FavoritePlacesCompanion(
@@ -1369,6 +1714,7 @@ class $$FavoritePlacesTableTableManager
                 name: name,
                 latitude: latitude,
                 longitude: longitude,
+                categoryCode: categoryCode,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -1378,6 +1724,7 @@ class $$FavoritePlacesTableTableManager
                 required String name,
                 required double latitude,
                 required double longitude,
+                Value<String?> categoryCode = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FavoritePlacesCompanion.insert(
@@ -1385,6 +1732,7 @@ class $$FavoritePlacesTableTableManager
                 name: name,
                 latitude: latitude,
                 longitude: longitude,
+                categoryCode: categoryCode,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -1575,6 +1923,184 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSetting,
       PrefetchHooks Function()
     >;
+typedef $$FestivalCacheEntriesTableCreateCompanionBuilder =
+    FestivalCacheEntriesCompanion Function({
+      required String cacheKey,
+      required String payload,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$FestivalCacheEntriesTableUpdateCompanionBuilder =
+    FestivalCacheEntriesCompanion Function({
+      Value<String> cacheKey,
+      Value<String> payload,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$FestivalCacheEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $FestivalCacheEntriesTable> {
+  $$FestivalCacheEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get cacheKey => $composableBuilder(
+    column: $table.cacheKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FestivalCacheEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $FestivalCacheEntriesTable> {
+  $$FestivalCacheEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get cacheKey => $composableBuilder(
+    column: $table.cacheKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FestivalCacheEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FestivalCacheEntriesTable> {
+  $$FestivalCacheEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get cacheKey =>
+      $composableBuilder(column: $table.cacheKey, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$FestivalCacheEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FestivalCacheEntriesTable,
+          FestivalCacheEntry,
+          $$FestivalCacheEntriesTableFilterComposer,
+          $$FestivalCacheEntriesTableOrderingComposer,
+          $$FestivalCacheEntriesTableAnnotationComposer,
+          $$FestivalCacheEntriesTableCreateCompanionBuilder,
+          $$FestivalCacheEntriesTableUpdateCompanionBuilder,
+          (
+            FestivalCacheEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $FestivalCacheEntriesTable,
+              FestivalCacheEntry
+            >,
+          ),
+          FestivalCacheEntry,
+          PrefetchHooks Function()
+        > {
+  $$FestivalCacheEntriesTableTableManager(
+    _$AppDatabase db,
+    $FestivalCacheEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FestivalCacheEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FestivalCacheEntriesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$FestivalCacheEntriesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> cacheKey = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FestivalCacheEntriesCompanion(
+                cacheKey: cacheKey,
+                payload: payload,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String cacheKey,
+                required String payload,
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => FestivalCacheEntriesCompanion.insert(
+                cacheKey: cacheKey,
+                payload: payload,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FestivalCacheEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FestivalCacheEntriesTable,
+      FestivalCacheEntry,
+      $$FestivalCacheEntriesTableFilterComposer,
+      $$FestivalCacheEntriesTableOrderingComposer,
+      $$FestivalCacheEntriesTableAnnotationComposer,
+      $$FestivalCacheEntriesTableCreateCompanionBuilder,
+      $$FestivalCacheEntriesTableUpdateCompanionBuilder,
+      (
+        FestivalCacheEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $FestivalCacheEntriesTable,
+          FestivalCacheEntry
+        >,
+      ),
+      FestivalCacheEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -1585,4 +2111,6 @@ class $AppDatabaseManager {
       $$FavoritePlacesTableTableManager(_db, _db.favoritePlaces);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$FestivalCacheEntriesTableTableManager get festivalCacheEntries =>
+      $$FestivalCacheEntriesTableTableManager(_db, _db.festivalCacheEntries);
 }

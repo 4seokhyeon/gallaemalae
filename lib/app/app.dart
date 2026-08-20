@@ -19,6 +19,11 @@ class GallaeMallaeApp extends ConsumerWidget {
         title: '갈래말래',
         debugShowCheckedModeBanner: false,
         theme: CupertinoAppTheme.light,
+        localizationsDelegates: const [
+          DefaultMaterialLocalizations.delegate,
+          DefaultCupertinoLocalizations.delegate,
+          DefaultWidgetsLocalizations.delegate,
+        ],
         routerConfig: router,
       );
     }

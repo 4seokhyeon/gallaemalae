@@ -10,5 +10,6 @@ abstract class FavoritePlace with _$FavoritePlace {
     required double latitude,
     required double longitude,
     required DateTime createdAt,
+    String? categoryCode,
   }) = _FavoritePlace;
 }

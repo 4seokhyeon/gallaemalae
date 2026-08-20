@@ -3,6 +3,8 @@ import 'package:gallaemalae/data/local/database_provider.dart';
 import 'package:gallaemalae/core/network/dio_provider.dart';
 import 'package:gallaemalae/data/remote/festival_remote_data_source.dart';
 import 'package:gallaemalae/data/repositories/api_festival_repository.dart';
+import 'package:gallaemalae/data/repositories/cached_festival_repository.dart';
+import 'package:gallaemalae/data/local/cache/festival_cache_store.dart';
 import 'package:gallaemalae/data/repositories/drift_user_activity_repository.dart';
 import 'package:gallaemalae/data/repositories/drift_personality_repository.dart';
 import 'package:gallaemalae/data/repositories/geolocator_location_repository.dart';
@@ -28,5 +30,9 @@ final festivalRemoteDataSourceProvider = Provider<FestivalRemoteDataSource>(
 );
 
 final festivalRepositoryProvider = Provider<FestivalRepository>((ref) {
-  return ApiFestivalRepository(ref.watch(festivalRemoteDataSourceProvider));
+  final remote = ApiFestivalRepository(
+    ref.watch(festivalRemoteDataSourceProvider),
+  );
+  final cache = FestivalCacheStore(ref.watch(appDatabaseProvider));
+  return CachedFestivalRepository(remote, cache);
 });

@@ -63,6 +63,7 @@ class DriftUserActivityRepository implements UserActivityRepository {
               latitude: row.latitude,
               longitude: row.longitude,
               createdAt: row.createdAt,
+              categoryCode: row.categoryCode,
             ),
           )
           .toList(),
@@ -79,6 +80,7 @@ class DriftUserActivityRepository implements UserActivityRepository {
             name: place.name,
             latitude: place.latitude,
             longitude: place.longitude,
+            categoryCode: Value(place.categoryCode),
             createdAt: Value(place.createdAt),
           ),
         );

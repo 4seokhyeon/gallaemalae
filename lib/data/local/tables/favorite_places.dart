@@ -5,6 +5,7 @@ class FavoritePlaces extends Table {
   TextColumn get name => text()();
   RealColumn get latitude => real()();
   RealColumn get longitude => real()();
+  TextColumn get categoryCode => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override

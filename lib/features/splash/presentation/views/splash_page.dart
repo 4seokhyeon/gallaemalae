@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gallaemalae/core/router/app_routes.dart';
 import 'package:gallaemalae/data/repositories/repository_providers.dart';
+import 'package:gallaemalae/features/onboarding/presentation/view_models/user_name_view_model.dart';
 import 'package:go_router/go_router.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
@@ -16,11 +17,18 @@ class _SplashPageState extends ConsumerState<SplashPage> {
     super.initState();
     Future<void>(() async {
       final personality = await ref.read(personalityRepositoryProvider).load();
+      final name = await ref
+          .read(userActivityRepositoryProvider)
+          .readSetting(userNameSettingKey);
       await Future<void>.delayed(const Duration(milliseconds: 550));
       if (!mounted) return;
-      context.go(
-        personality == null ? AppRoutes.personalityTest : AppRoutes.home,
-      );
+      if (name == null || name.trim().isEmpty) {
+        context.go(AppRoutes.nameEntry);
+      } else {
+        context.go(
+          personality == null ? AppRoutes.personalityTest : AppRoutes.home,
+        );
+      }
     });
   }
 
