@@ -32,7 +32,8 @@ class FestivalListState {
   final bool isLoadingMore;
   final String? errorMessage;
   bool get hasMore => page + 1 < totalPages;
-  List<FestivalSummary> get visibleItems => filterFestivalItems(items, query);
+  List<FestivalSummary> get visibleItems =>
+      filterFestivalItems(items, query, category: category);
   bool get hasActiveFilters =>
       query.isNotEmpty || regionCode != null || from != null || to != null;
 
@@ -214,15 +215,17 @@ class FestivalListViewModel extends AutoDisposeNotifier<FestivalListState> {
 
 List<FestivalSummary> filterFestivalItems(
   List<FestivalSummary> items,
-  String query,
-) {
+  String query, {
+  FestivalCategory? category,
+}) {
   final normalized = query.trim().toLowerCase();
-  if (normalized.isEmpty) return items;
   return items
       .where(
         (festival) =>
-            festival.title.toLowerCase().contains(normalized) ||
-            festival.address.toLowerCase().contains(normalized),
+            (category == null || festival.category == category) &&
+            (normalized.isEmpty ||
+                festival.title.toLowerCase().contains(normalized) ||
+                festival.address.toLowerCase().contains(normalized)),
       )
       .toList();
 }

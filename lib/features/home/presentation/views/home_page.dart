@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gallaemalae/core/layout/app_layout.dart';
 import 'package:gallaemalae/core/navigation/tab_reselection.dart';
 import 'package:gallaemalae/core/router/app_routes.dart';
+import 'package:gallaemalae/core/network/festival_request_status.dart';
 import 'package:gallaemalae/features/home/presentation/view_models/home_view_model.dart';
 import 'package:gallaemalae/features/personality/presentation/view_models/personality_view_model.dart';
 import 'package:gallaemalae/domain/entities/festival.dart';
@@ -23,6 +24,7 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final homeState = ref.watch(homeViewModelProvider);
+    final isRetryingFestivalList = ref.watch(festivalRequestStatusProvider);
     final personality = ref.watch(personalityProvider).value;
     final festivals = homeState.festivals?.items ?? const <FestivalSummary>[];
     final featuredFestival = festivals.isEmpty ? null : festivals.first;
@@ -46,6 +48,16 @@ class HomePage extends ConsumerWidget {
                 sliver: SliverList.list(
                   children: [
                     const _SectionTitle(icon: '✦', title: '내 취향 축제 추천'),
+                    if (isRetryingFestivalList) ...[
+                      const SizedBox(height: 14),
+                      const _FestivalRetryNotice(),
+                    ],
+                    if (homeState.recommendationNotice != null) ...[
+                      const SizedBox(height: 14),
+                      _RecommendationNotice(
+                        message: homeState.recommendationNotice!,
+                      ),
+                    ],
                     if (featuredFestival != null) ...[
                       const SizedBox(height: 16),
                       _HeroRecommendationCard(
@@ -66,6 +78,16 @@ class HomePage extends ConsumerWidget {
                         message: homeState.errorMessage!,
                         onRetry: () =>
                             ref.read(homeViewModelProvider.notifier).refresh(),
+                      )
+                    else if (festivals.isEmpty)
+                      _HomeEmptyCard(
+                        onShowAll: () => context.push(AppRoutes.festivals),
+                        onRetest: () {
+                          ref
+                              .read(personalityTestControllerProvider.notifier)
+                              .reset();
+                          context.go(AppRoutes.personalityTest);
+                        },
                       )
                     else
                       for (final festival in festivals.skip(1)) ...[
@@ -465,61 +487,65 @@ class _ApiFestivalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: () => context.push(AppRoutes.detail(festival.id.toString())),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFF0B8A4)),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 86,
-                height: 86,
-                child: _FestivalImage(
-                  url: festival.primaryImageUrl,
-                  fallbackColor: const Color(0xFFDCE8DE),
+    final borderRadius = BorderRadius.circular(18);
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: borderRadius,
+        side: const BorderSide(color: Color(0xFFF0B8A4)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: borderRadius,
+        onTap: () => context.push(AppRoutes.detail(festival.id.toString())),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 86,
+                  height: 86,
+                  child: _FestivalImage(
+                    url: festival.primaryImageUrl,
+                    fallbackColor: const Color(0xFFDCE8DE),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    festival.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      festival.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    festival.address,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: _muted, fontSize: 12),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${_shortDate(festival.startDate)} – ${_shortDate(festival.endDate)}',
-                    style: const TextStyle(color: _brand, fontSize: 12),
-                  ),
-                ],
+                    const SizedBox(height: 7),
+                    Text(
+                      festival.address,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: _muted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${_shortDate(festival.startDate)} – ${_shortDate(festival.endDate)}',
+                      style: const TextStyle(color: _brand, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: _muted),
-          ],
+              const Icon(Icons.chevron_right_rounded, color: _muted),
+            ],
+          ),
         ),
       ),
     );
@@ -542,9 +568,107 @@ class _ApiErrorCard extends StatelessWidget {
     ),
     child: Column(
       children: [
+        const Icon(Icons.cloud_off_rounded, color: _brand, size: 34),
+        const SizedBox(height: 8),
+        const Text(
+          '첫 축제 정보를 불러오지 못했어요',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
         Text(message, textAlign: TextAlign.center),
         const SizedBox(height: 10),
         TextButton(onPressed: onRetry, child: const Text('다시 시도')),
+      ],
+    ),
+  );
+}
+
+class _FestivalRetryNotice extends StatelessWidget {
+  const _FestivalRetryNotice();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF4E5),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: const Row(
+      children: [
+        SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        SizedBox(width: 10),
+        Expanded(child: Text('서버에서 축제 정보를 불러오는 중이에요')),
+      ],
+    ),
+  );
+}
+
+class _RecommendationNotice extends StatelessWidget {
+  const _RecommendationNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF4E5),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: const Color(0xFFFFD49A)),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.info_outline_rounded, color: Color(0xFF9A5B00)),
+        const SizedBox(width: 10),
+        Expanded(child: Text(message, style: const TextStyle(fontSize: 13))),
+      ],
+    ),
+  );
+}
+
+class _HomeEmptyCard extends StatelessWidget {
+  const _HomeEmptyCard({required this.onShowAll, required this.onRetest});
+
+  final VoidCallback onShowAll;
+  final VoidCallback onRetest;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(top: 16),
+    padding: const EdgeInsets.all(22),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFE5E2E4)),
+    ),
+    child: Column(
+      children: [
+        const Icon(Icons.search_off_rounded, color: _muted, size: 38),
+        const SizedBox(height: 12),
+        const Text(
+          '조건에 맞는 축제를 찾지 못했어요',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 7),
+        const Text(
+          '현재 등록된 일정에서는 추천할 축제가 없습니다.\n검색 범위를 넓히거나 성향을 다시 설정해 보세요.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: _muted, fontSize: 13, height: 1.5),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: onShowAll,
+            child: const Text('전체 축제 보기'),
+          ),
+        ),
+        TextButton(onPressed: onRetest, child: const Text('성향 다시 설정')),
       ],
     ),
   );

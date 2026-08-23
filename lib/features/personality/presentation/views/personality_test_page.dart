@@ -11,38 +11,43 @@ const _ink = Color(0xFF29262C);
 const _muted = Color(0xFF776E6D);
 
 class _Question {
-  const _Question(this.title, this.subtitle, this.options, this.icon);
+  const _Question(
+    this.title,
+    this.subtitle,
+    this.options,
+    this.icon, {
+    this.multi = false,
+  });
   final String title;
   final String subtitle;
   final List<String> options;
   final IconData icon;
+  final bool multi;
 }
 
 const _questions = [
-  _Question('축제의 분위기, 당신의 선택은?', '어떤 소음이 더 즐거운가요?', [
-    '에너지 넘치는 시끌벅적한 축제',
-    '고즈넉하고 조용한 감성 축제',
-  ], Icons.celebration_rounded),
   _Question(
-    '축제에서 가장 기대되는 순간은 언제인가요?',
-    '마음이 먼저 향하는 장면을 골라주세요.',
-    ['화려한 무대 공연과 열광적인 환호', '로컬 음식을 맛보며 즐기는 여유로운 산책'],
-    Icons.theater_comedy_rounded,
+    '평소 축제·여행에서 끌리는 걸 골라주세요',
+    '가장 마음에 드는 콘텐츠를 1~2개 선택해 주세요.',
+    ['자연 풍경·산책', '먹거리·특산물', '공연·불꽃놀이·이벤트', '전통·역사·유적', '체험·전시·문화행사', '딱히 상관없음'],
+    Icons.category_rounded,
+    multi: true,
   ),
-  _Question('함께 축제를 즐기고 싶은 파트너는 누구인가요?', '가장 설레는 축제의 순간을 상상해 보세요.', [
-    '처음 본 사람들과도 친구가 되는 북적이는 모임',
-    '마음이 잘 맞는 소수의 친구나 연인',
+  _Question('축제에 갔을 때 어느 쪽이 더 좋으세요?', '선호하는 현장 분위기를 선택해 주세요.', [
+    '사람 많고 활기찬 분위기',
+    '적당히 붐비는 정도',
+    '한산하게 여유 있게',
   ], Icons.groups_rounded),
-  _Question('축제 장소를 선택할 때 가장 중요한 기준은?', '당신의 직감을 믿고 선택해보세요.', [
-    '최신 트렌드와 화제성',
-    '전통과 깊은 의미',
-  ], Icons.explore_rounded),
-  _Question(
-    '축제에서 가장 중요하게 생각하는 가치는?',
-    '당신의 축제 성향을 결정짓는 마지막 관문입니다.',
-    ['새로운 사람들과의 만남과 에너지', '나만의 온전한 휴식과 감성 충전'],
-    Icons.auto_awesome_rounded,
-  ),
+  _Question('주로 언제 나들이하는 걸 좋아하세요?', '가장 편안한 방문 시간대를 선택해 주세요.', [
+    '아침 일찍',
+    '낮부터 오후',
+    '해 질 무렵부터 저녁',
+  ], Icons.schedule_rounded),
+  _Question('축제, 어디까지 가볼 생각 있으세요?', '추천받고 싶은 활동 반경을 선택해 주세요.', [
+    '집 근처 같은 시·군',
+    '조금 멀어도 괜찮은 인접 지역',
+    '전국 어디든',
+  ], Icons.map_rounded),
 ];
 
 class PersonalityTestPage extends ConsumerStatefulWidget {
@@ -118,7 +123,7 @@ class _PersonalityTestPageState extends ConsumerState<PersonalityTestPage> {
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(0, 28, 0, 24),
+                  padding: const EdgeInsets.fromLTRB(0, 28, 0, 96),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -135,7 +140,7 @@ class _PersonalityTestPageState extends ConsumerState<PersonalityTestPage> {
                           ),
                           const Spacer(),
                           Text(
-                            '${((_index + 1) * 20)}%',
+                            '${(((_index + 1) / _questions.length) * 100).round()}%',
                             style: const TextStyle(color: _muted, fontSize: 12),
                           ),
                         ],
@@ -144,7 +149,7 @@ class _PersonalityTestPageState extends ConsumerState<PersonalityTestPage> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(5),
                         child: LinearProgressIndicator(
-                          value: (_index + 1) / 5,
+                          value: (_index + 1) / _questions.length,
                           minHeight: 8,
                           color: _orange,
                           backgroundColor: const Color(0xFFE6E6E9),
@@ -193,15 +198,30 @@ class _PersonalityTestPageState extends ConsumerState<PersonalityTestPage> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      for (var option = 0; option < 2; option++) ...[
+                      for (
+                        var option = 0;
+                        option < question.options.length;
+                        option++
+                      ) ...[
                         _OptionCard(
                           text: question.options[option],
-                          selected: selected == option,
-                          onTap: () => ref
-                              .read(personalityTestControllerProvider.notifier)
-                              .answer(_index, option),
+                          selected: question.multi
+                              ? selected != null &&
+                                    (selected & (1 << option)) != 0
+                              : selected == option,
+                          onTap: () {
+                            final controller = ref.read(
+                              personalityTestControllerProvider.notifier,
+                            );
+                            if (question.multi) {
+                              controller.toggleCategory(option);
+                            } else {
+                              controller.answer(_index, option);
+                            }
+                          },
                         ),
-                        if (option == 0) const SizedBox(height: 14),
+                        if (option < question.options.length - 1)
+                          const SizedBox(height: 10),
                       ],
                     ],
                   ),
@@ -231,7 +251,9 @@ class _PersonalityTestPageState extends ConsumerState<PersonalityTestPage> {
                             ),
                           )
                         : Text(
-                            _index == 4 ? '결과 확인하기  ↗' : '다음 질문  ›',
+                            _index == _questions.length - 1
+                                ? '결과 확인하기  ↗'
+                                : '다음 질문  ›',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,

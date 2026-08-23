@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gallaemalae/core/router/app_routes.dart';
+import 'package:gallaemalae/core/network/festival_request_status.dart';
 import 'package:gallaemalae/domain/entities/festival.dart';
 import 'package:gallaemalae/features/festivals/presentation/view_models/festival_list_view_model.dart';
 import 'package:go_router/go_router.dart';
@@ -42,6 +43,7 @@ class _FestivalListPageState extends ConsumerState<FestivalListPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(festivalListViewModelProvider);
+    final isRetrying = ref.watch(festivalRequestStatusProvider);
     final body = Column(
       children: [
         Padding(
@@ -100,6 +102,7 @@ class _FestivalListPageState extends ConsumerState<FestivalListPage> {
                 .clearRecentSearches,
           ),
         _CategoryFilters(selected: state.category),
+        if (isRetrying) const _RetryingNotice(),
         if (state.hasActiveFilters || state.category != null)
           _ActiveFilterSummary(
             state: state,
@@ -124,7 +127,10 @@ class _FestivalListPageState extends ConsumerState<FestivalListPage> {
       return CupertinoPageScaffold(
         backgroundColor: _background,
         navigationBar: const CupertinoNavigationBar(middle: Text('전체 축제')),
-        child: SafeArea(bottom: false, child: body),
+        child: SafeArea(
+          bottom: false,
+          child: Material(color: _background, child: body),
+        ),
       );
     }
     return Scaffold(
@@ -232,6 +238,26 @@ class _FestivalListPageState extends ConsumerState<FestivalListPage> {
   }
 }
 
+class _RetryingNotice extends StatelessWidget {
+  const _RetryingNotice();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        SizedBox(width: 10),
+        Expanded(child: Text('서버에서 축제 정보를 불러오는 중이에요')),
+      ],
+    ),
+  );
+}
+
 const _regions = <(String, String?)>[
   ('전체 지역', null),
   ('서울', '11'),
@@ -333,6 +359,7 @@ class _CategoryFilters extends ConsumerWidget {
       ('먹거리', FestivalCategory.food),
       ('공연', FestivalCategory.performance),
       ('전통', FestivalCategory.tradition),
+      ('기타', FestivalCategory.other),
     ];
     return SizedBox(
       height: 62,
@@ -373,11 +400,23 @@ class _FestivalList extends StatelessWidget {
       return const Center(child: CircularProgressIndicator());
     }
     if (items.isEmpty) {
+      final failedToLoadInitialData =
+          state.errorMessage != null && state.page < 0;
       return ListView(
         controller: controller,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           const SizedBox(height: 150),
+          if (failedToLoadInitialData) ...[
+            const Icon(Icons.cloud_off_rounded, color: _brand, size: 42),
+            const SizedBox(height: 12),
+            const Text(
+              '첫 축제 정보를 불러오지 못했어요',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+          ],
           Text(
             state.errorMessage ?? '조건에 맞는 축제가 없습니다.',
             textAlign: TextAlign.center,

@@ -12,4 +12,5 @@ abstract interface class UserActivityRepository {
 
   Future<String?> readSetting(String key);
   Future<void> writeSetting(String key, String value);
+  Future<void> deleteSetting(String key);
 }

@@ -21,4 +21,6 @@ class FestivalCacheStore {
       ..where((row) => row.cacheKey.equals(key));
     return (await query.getSingleOrNull())?.payload;
   }
+
+  Future<void> clear() => _database.delete(_database.festivalCacheEntries).go();
 }

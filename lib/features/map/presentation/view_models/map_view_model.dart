@@ -23,6 +23,8 @@ class MapViewState {
     this.isLocating = false,
     this.isLoading = false,
     this.errorMessage,
+    this.analyses = const {},
+    this.analyzingFestivalIds = const {},
   });
 
   final FestivalMapFilter filter;
@@ -31,6 +33,8 @@ class MapViewState {
   final bool isLocating;
   final bool isLoading;
   final String? errorMessage;
+  final Map<int, FestivalAnalysis> analyses;
+  final Set<int> analyzingFestivalIds;
 
   List<FestivalSummary> get visibleFestivals {
     final category = filter.category;
@@ -49,6 +53,11 @@ class MapViewState {
     return null;
   }
 
+  FestivalAnalysis? get selectedAnalysis => analyses[selectedFestivalId];
+  bool get isSelectedFestivalAnalyzing =>
+      selectedFestivalId != null &&
+      analyzingFestivalIds.contains(selectedFestivalId);
+
   MapViewState copyWith({
     FestivalMapFilter? filter,
     List<FestivalSummary>? festivals,
@@ -58,6 +67,8 @@ class MapViewState {
     String? errorMessage,
     bool clearSelectedFestival = false,
     bool clearError = false,
+    Map<int, FestivalAnalysis>? analyses,
+    Set<int>? analyzingFestivalIds,
   }) {
     return MapViewState(
       filter: filter ?? this.filter,
@@ -68,6 +79,8 @@ class MapViewState {
       isLocating: isLocating ?? this.isLocating,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      analyses: analyses ?? this.analyses,
+      analyzingFestivalIds: analyzingFestivalIds ?? this.analyzingFestivalIds,
     );
   }
 }
@@ -92,6 +105,7 @@ class MapViewModel extends AutoDisposeNotifier<MapViewState> {
             size: 100,
           );
       state = state.copyWith(festivals: page.items, isLoading: false);
+      await analyzeNearest(latitude: 37.5283, longitude: 126.9326, limit: 5);
     } catch (error) {
       state = state.copyWith(isLoading: false, errorMessage: error.toString());
     }
@@ -101,8 +115,63 @@ class MapViewModel extends AutoDisposeNotifier<MapViewState> {
     state = state.copyWith(filter: filter, clearSelectedFestival: true);
   }
 
-  void selectFestival(int festivalId) {
+  Future<void> selectFestival(int festivalId) async {
     state = state.copyWith(selectedFestivalId: festivalId);
+    await analyzeFestival(festivalId);
+  }
+
+  Future<void> analyzeFestival(int festivalId) async {
+    if (state.analyses.containsKey(festivalId) ||
+        state.analyzingFestivalIds.contains(festivalId)) {
+      return;
+    }
+    FestivalSummary? festival;
+    for (final item in state.festivals) {
+      if (item.id == festivalId) festival = item;
+    }
+    if (festival == null) return;
+    final date = analysisDateForFestival(festival, DateTime.now());
+    if (date == null) return;
+    state = state.copyWith(
+      analyzingFestivalIds: {...state.analyzingFestivalIds, festivalId},
+    );
+    try {
+      final analysis = await ref
+          .read(festivalRepositoryProvider)
+          .analyze(festivalId, date);
+      if (analysis.freshness == DataFreshness.unavailable) return;
+      state = state.copyWith(
+        analyses: {...state.analyses, festivalId: analysis},
+      );
+    } catch (_) {
+      // 개별 마커 분석 실패는 다른 마커와 축제 목록 표시에 영향을 주지 않습니다.
+    } finally {
+      state = state.copyWith(
+        analyzingFestivalIds: {...state.analyzingFestivalIds}
+          ..remove(festivalId),
+      );
+    }
+  }
+
+  Future<void> analyzeNearest({
+    required double latitude,
+    required double longitude,
+    int limit = 5,
+  }) async {
+    final candidates = nearestFestivals(
+      state.visibleFestivals,
+      latitude: latitude,
+      longitude: longitude,
+      limit: limit,
+    ).where((festival) => !state.analyses.containsKey(festival.id)).toList();
+    for (var index = 0; index < candidates.length; index += 2) {
+      final end = (index + 2).clamp(0, candidates.length);
+      await Future.wait(
+        candidates
+            .sublist(index, end)
+            .map((festival) => analyzeFestival(festival.id)),
+      );
+    }
   }
 
   void clearSelectedFestival() {
@@ -112,6 +181,41 @@ class MapViewModel extends AutoDisposeNotifier<MapViewState> {
   void setLocating(bool isLocating) {
     state = state.copyWith(isLocating: isLocating);
   }
+}
+
+DateTime? analysisDateForFestival(FestivalSummary festival, DateTime now) {
+  final today = DateTime(now.year, now.month, now.day);
+  final start = DateTime(
+    festival.startDate.year,
+    festival.startDate.month,
+    festival.startDate.day,
+  );
+  final end = DateTime(
+    festival.endDate.year,
+    festival.endDate.month,
+    festival.endDate.day,
+  );
+  if (today.isAfter(end)) return null;
+  return today.isBefore(start) ? start : today;
+}
+
+List<FestivalSummary> nearestFestivals(
+  List<FestivalSummary> festivals, {
+  required double latitude,
+  required double longitude,
+  int limit = 5,
+}) {
+  final sorted = [...festivals]
+    ..sort((a, b) {
+      double distance(FestivalSummary festival) {
+        final lat = festival.latitude - latitude;
+        final lng = festival.longitude - longitude;
+        return lat * lat + lng * lng;
+      }
+
+      return distance(a).compareTo(distance(b));
+    });
+  return sorted.take(limit).toList();
 }
 
 final mapViewModelProvider =

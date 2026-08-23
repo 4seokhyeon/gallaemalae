@@ -13,7 +13,9 @@ import 'package:gallaemalae/domain/repositories/festival_repository.dart';
 import 'package:gallaemalae/domain/repositories/personality_repository.dart';
 import 'package:gallaemalae/domain/repositories/user_activity_repository.dart';
 import 'package:gallaemalae/features/analysis/presentation/views/analysis_page.dart';
+import 'package:gallaemalae/features/detail/presentation/views/detail_page.dart';
 import 'package:gallaemalae/features/festivals/presentation/view_models/festival_list_view_model.dart';
+import 'package:gallaemalae/features/festivals/presentation/views/festival_list_page.dart';
 import 'package:gallaemalae/features/map/presentation/view_models/map_view_model.dart';
 import 'package:gallaemalae/features/profile/presentation/views/profile_page.dart';
 
@@ -72,8 +74,8 @@ class _FakeFestivalRepository implements FestivalRepository {
         period: DayPeriod.morning,
         startTime: '09:00',
         endTime: '12:00',
-        score: 25,
-        level: CrowdLevel.low,
+        score: 100,
+        level: CrowdLevel.veryHigh,
       ),
     ],
     recommendedPeriod: DayPeriod.morning,
@@ -124,6 +126,31 @@ class _FakeFestivalRepository implements FestivalRepository {
   Future<FestivalAnalysis> analyze(int id, DateTime date) async => analysis;
 }
 
+class _FallbackFestivalRepository extends _FakeFestivalRepository {
+  final calls = <({Set<FestivalCategory> categories, int days})>[];
+
+  @override
+  Future<FestivalPage> search({
+    String? regionCode,
+    DateTime? from,
+    DateTime? to,
+    Set<FestivalCategory> categories = const {},
+    int page = 0,
+    int size = 20,
+  }) async {
+    final days = to!.difference(from!).inDays;
+    calls.add((categories: categories, days: days));
+    final showFallback = categories.isEmpty && days == 90;
+    return FestivalPage(
+      items: showFallback ? [_FakeFestivalRepository.festival] : const [],
+      page: 0,
+      size: size,
+      totalElements: showFallback ? 1 : 0,
+      totalPages: showFallback ? 1 : 0,
+    );
+  }
+}
+
 class _FakeUserActivityRepository implements UserActivityRepository {
   _FakeUserActivityRepository([Map<String, String>? settings])
     : _settings = {...?settings};
@@ -147,6 +174,11 @@ class _FakeUserActivityRepository implements UserActivityRepository {
   @override
   Future<void> writeSetting(String key, String value) async {
     _settings[key] = value;
+  }
+
+  @override
+  Future<void> deleteSetting(String key) async {
+    _settings.remove(key);
   }
 }
 
@@ -257,7 +289,8 @@ void main() {
   testWidgets('앱이 정상적으로 시작된다', (tester) async {
     await _pumpThroughSplash(tester);
 
-    expect(find.text('내 취향 축제 추천'), findsOneWidget);
+    expect(find.text('홈'), findsOneWidget);
+    expect(find.byType(CustomScrollView), findsOneWidget);
     expect(_FakeFestivalRepository.lastSize, 20);
     expect(
       _FakeFestivalRepository.lastTo!.difference(
@@ -266,6 +299,45 @@ void main() {
       const Duration(days: 30),
     );
     expect(_FakeFestivalRepository.lastCategories, isEmpty);
+  });
+
+  testWidgets('성향 추천이 없으면 조건을 단계적으로 완화해 대체 축제를 표시한다', (tester) async {
+    final repository = _FallbackFestivalRepository();
+    final personality = FestivalPersonality(
+      type: FestivalPersonalityType.calmRomantic,
+      answers: const [1, 2, 0, 2],
+      completedAt: DateTime(2026),
+      preferredCategories: const {FestivalCategory.nature},
+      crowdPreference: FestivalCrowdPreference.relaxed,
+      preferredPeriod: DayPeriod.morning,
+      travelScope: FestivalTravelScope.nationwide,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          personalityRepositoryProvider.overrideWithValue(
+            _FakePersonalityRepository(personality),
+          ),
+          festivalRepositoryProvider.overrideWithValue(repository),
+          userActivityRepositoryProvider.overrideWithValue(
+            _FakeUserActivityRepository(const {'user_name_v1': '테스트 사용자'}),
+          ),
+        ],
+        child: const GallaeMallaeApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+
+    final callKeys = repository.calls
+        .map(
+          (call) =>
+              '${call.categories.map((value) => value.name).join(',')}:${call.days}',
+        )
+        .toSet();
+    expect(callKeys, {'nature:30', 'nature:90', ':30', ':90'});
+    expect(find.textContaining('전체 유형을 90일까지'), findsOneWidget);
+    expect(find.text('테스트 축제'), findsOneWidget);
   });
 
   testWidgets('Android 첫 실행 후 첫 뒤로가기는 종료 안내를 표시한다', (tester) async {
@@ -307,6 +379,57 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pump();
     expect(find.text('뒤로가기를 한 번 더 누르면 앱이 종료됩니다.'), findsOneWidget);
+  });
+
+  testWidgets('Android 상세 화면에서 뒤로가기는 한 번에 홈으로 이동한다', (tester) async {
+    await _pumpThroughSplash(tester);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('축제 상세 및 혼잡도 보기'));
+    await tester.pumpAndSettle();
+    expect(find.text('상세 예측'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('홈'), findsOneWidget);
+    expect(find.byType(CustomScrollView), findsOneWidget);
+    expect(find.text('뒤로가기를 한 번 더 누르면 앱이 종료됩니다.'), findsNothing);
+  });
+
+  testWidgets('Android 전체 축제 화면에서 뒤로가기는 한 번에 홈으로 이동한다', (tester) async {
+    await _pumpThroughSplash(tester);
+
+    await tester.tap(find.byIcon(Icons.search_rounded).last);
+    await tester.pumpAndSettle();
+    expect(find.text('전체 축제'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('내 취향 축제 추천'), findsOneWidget);
+    expect(find.text('뒤로가기를 한 번 더 누르면 앱이 종료됩니다.'), findsNothing);
+  });
+
+  testWidgets('전체 축제에서 연 상세 화면은 뒤로가면 전체 축제로 돌아간다', (tester) async {
+    await _pumpThroughSplash(tester);
+
+    await tester.tap(find.byIcon(Icons.search_rounded).last);
+    await tester.pumpAndSettle();
+    expect(find.text('전체 축제'), findsOneWidget);
+
+    await tester.tap(find.text('페이지 1 축제'));
+    await tester.pumpAndSettle();
+    expect(find.text('상세 예측'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('전체 축제'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('내 취향 축제 추천'), findsOneWidget);
   });
 
   testWidgets('다른 탭에서 돌아오면 화면 스크롤이 맨 위에서 다시 시작한다', (tester) async {
@@ -436,7 +559,38 @@ void main() {
     await _pumpThroughSplash(tester, completed: false);
 
     expect(find.text('QUESTION 01'), findsOneWidget);
-    expect(find.text('축제의 분위기, 당신의 선택은?'), findsOneWidget);
+    expect(find.text('평소 축제·여행에서 끌리는 걸 골라주세요'), findsOneWidget);
+  });
+
+  testWidgets('4문항 성향 테스트를 완료하면 결과 화면을 표시한다', (tester) async {
+    await _pumpThroughSplash(tester, completed: false);
+
+    await tester.tap(find.text('자연 풍경·산책'));
+    await tester.pump();
+    await tester.tap(find.text('다음 질문  ›'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('적당히 붐비는 정도'));
+    await tester.pump();
+    await tester.tap(find.text('다음 질문  ›'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('낮부터 오후'));
+    await tester.pump();
+    await tester.tap(find.text('다음 질문  ›'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('전국 어디든'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('전국 어디든'));
+    await tester.pump();
+    await tester.tap(find.text('결과 확인하기  ↗'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('성향 테스트 결과 리포트'), findsOneWidget);
+    expect(find.text('여유로운 축제 여행가'), findsOneWidget);
+    expect(find.text('적당한 인파'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('이름이 없는 첫 실행 사용자는 이름 입력 후 성향 테스트로 이동한다', (tester) async {
@@ -470,7 +624,12 @@ void main() {
     await tester.tap(find.text('프로필'));
     await tester.pumpAndSettle();
     expect(find.text('테스트 사용자 님'), findsOneWidget);
-    expect(find.text('열정적인 축제 탐험가'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('활기찬 축제 탐험가'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('활기찬 축제 탐험가'), findsOneWidget);
 
     await tester.tap(find.text('다시 테스트하기'));
     await tester.pumpAndSettle();
@@ -498,12 +657,90 @@ void main() {
 
     expect(find.text('혼잡도 분석'), findsOneWidget);
     expect(find.text('어떤 축제가 궁금하세요?'), findsOneWidget);
+    await tester.tap(find.text('테스트 축제'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CupertinoDatePicker), findsOneWidget);
     final exception = tester.takeException();
     debugDefaultTargetPlatformOverride = null;
     expect(exception, isNull);
   });
 
-  testWidgets('iOS 프로필 설정 스위치는 Material 조상 없이 렌더링된다', (tester) async {
+  testWidgets('iOS 상세 예측 화면은 Material 조상 오류 없이 렌더링된다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          festivalRepositoryProvider.overrideWithValue(
+            _FakeFestivalRepository(),
+          ),
+          userActivityRepositoryProvider.overrideWithValue(
+            _FakeUserActivityRepository(),
+          ),
+        ],
+        child: const CupertinoApp(home: DetailPage(placeId: '1')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('실시간 혼잡 점수'), findsOneWidget);
+    expect(find.text('42'), findsOneWidget);
+    final exception = tester.takeException();
+    debugDefaultTargetPlatformOverride = null;
+    expect(exception, isNull);
+  });
+
+  testWidgets('iOS에서 상세 화면은 스와이프 가능한 Cupertino 라우트로 열린다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await _pumpThroughSplash(tester);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('축제 상세 및 혼잡도 보기'));
+    await tester.pumpAndSettle();
+
+    final route = ModalRoute.of(tester.element(find.text('상세 예측')));
+    final exception = tester.takeException();
+    debugDefaultTargetPlatformOverride = null;
+    expect(route?.settings, isA<CupertinoPage<void>>());
+    expect(exception, isNull);
+  });
+
+  testWidgets('iOS 전체 축제 화면의 카테고리 필터가 정상 렌더링된다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          festivalRepositoryProvider.overrideWithValue(
+            _FakeFestivalRepository(),
+          ),
+          userActivityRepositoryProvider.overrideWithValue(
+            _FakeUserActivityRepository(),
+          ),
+        ],
+        child: const CupertinoApp(
+          localizationsDelegates: [
+            DefaultMaterialLocalizations.delegate,
+            DefaultCupertinoLocalizations.delegate,
+            DefaultWidgetsLocalizations.delegate,
+          ],
+          home: FestivalListPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChoiceChip), findsNWidgets(7));
+    final exception = tester.takeException();
+    debugDefaultTargetPlatformOverride = null;
+    expect(exception, isNull);
+  });
+
+  testWidgets('iOS 프로필 데이터 설정은 Material 조상 없이 렌더링된다', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
 
     await tester.pumpWidget(
@@ -513,22 +750,65 @@ void main() {
             _FakePersonalityRepository(_completedPersonality),
           ),
         ],
-        child: const CupertinoApp(home: ProfilePage()),
+        child: const CupertinoApp(
+          localizationsDelegates: [
+            DefaultMaterialLocalizations.delegate,
+            DefaultCupertinoLocalizations.delegate,
+            DefaultWidgetsLocalizations.delegate,
+          ],
+          home: ProfilePage(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('실시간 혼잡도 알림'),
+      find.text('앱 데이터 전체 초기화'),
       500,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pump();
 
-    final switchCount = find.byType(CupertinoSwitch).evaluate().length;
     final exception = tester.takeException();
     debugDefaultTargetPlatformOverride = null;
 
-    expect(switchCount, 1);
+    expect(find.text('앱 데이터 전체 초기화'), findsOneWidget);
+    expect(exception, isNull);
+  });
+
+  testWidgets('iOS 프로필에서 이름을 변경해도 Overlay 예외가 발생하지 않는다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          personalityRepositoryProvider.overrideWithValue(
+            _FakePersonalityRepository(_completedPersonality),
+          ),
+          userActivityRepositoryProvider.overrideWithValue(
+            _FakeUserActivityRepository(const {'user_name_v1': '테스트 사용자'}),
+          ),
+        ],
+        child: const CupertinoApp(
+          localizationsDelegates: [
+            DefaultMaterialLocalizations.delegate,
+            DefaultCupertinoLocalizations.delegate,
+            DefaultWidgetsLocalizations.delegate,
+          ],
+          home: ProfilePage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('이름 변경').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(CupertinoTextField), '변경 이름');
+    await tester.tap(find.text('저장'));
+    await tester.pumpAndSettle();
+
+    final exception = tester.takeException();
+    debugDefaultTargetPlatformOverride = null;
+    expect(find.text('변경 이름 님'), findsOneWidget);
     expect(exception, isNull);
   });
 }

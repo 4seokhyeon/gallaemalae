@@ -29,7 +29,7 @@ class AdaptivePage extends StatelessWidget {
               AppLayout.horizontalPadding(context),
               AppLayout.navigationOverlayInset(context) + 16,
             ),
-            child: child,
+            child: Material(type: MaterialType.transparency, child: child),
           ),
         ),
       );

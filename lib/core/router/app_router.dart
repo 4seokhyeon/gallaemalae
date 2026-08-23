@@ -1,3 +1,6 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gallaemalae/core/router/app_routes.dart';
 import 'package:gallaemalae/features/analysis/presentation/views/analysis_page.dart';
@@ -64,25 +67,38 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.festivals,
-        builder: (context, state) => const FestivalListPage(),
+        pageBuilder: (_, state) =>
+            _adaptivePage(key: state.pageKey, child: const FestivalListPage()),
       ),
       GoRoute(
         path: AppRoutes.favoriteFestivals,
-        builder: (context, state) => const FavoriteFestivalsPage(),
+        pageBuilder: (_, state) => _adaptivePage(
+          key: state.pageKey,
+          child: const FavoriteFestivalsPage(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.visitPlans,
-        builder: (context, state) => const VisitPlansPage(),
+        pageBuilder: (_, state) =>
+            _adaptivePage(key: state.pageKey, child: const VisitPlansPage()),
       ),
       GoRoute(
         path: '/detail/:placeId',
-        builder: (context, state) {
-          return DetailPage(placeId: state.pathParameters['placeId']!);
-        },
+        pageBuilder: (_, state) => _adaptivePage(
+          key: state.pageKey,
+          child: DetailPage(placeId: state.pathParameters['placeId']!),
+        ),
       ),
     ],
   );
 });
+
+Page<void> _adaptivePage({required LocalKey key, required Widget child}) {
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    return CupertinoPage<void>(key: key, child: child);
+  }
+  return MaterialPage<void>(key: key, child: child);
+}
 
 int _tabIndexFor(String path) => switch (path) {
   AppRoutes.map => 1,

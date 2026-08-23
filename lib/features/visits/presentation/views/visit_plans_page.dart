@@ -186,8 +186,7 @@ class VisitPlansPage extends ConsumerWidget {
         color: CupertinoColors.systemBackground.resolveFrom(popupContext),
         child: Column(
           children: [
-            SizedBox(
-              height: 260,
+            Expanded(
               child: CupertinoDatePicker(
                 mode: CupertinoDatePickerMode.date,
                 initialDateTime: initial,

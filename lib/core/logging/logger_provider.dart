@@ -22,11 +22,8 @@ class AppLogger {
 final loggerProvider = Provider<AppLogger>((ref) {
   return AppLogger(
     Logger(
-      printer: PrettyPrinter(
-        methodCount: 0,
-        errorMethodCount: 5,
-        printEmojis: false,
-      ),
+      // Xcode와 `flutter run` 콘솔에 ANSI 제어 문자가 노출되지 않게 합니다.
+      printer: SimplePrinter(colors: false, printTime: false),
     ),
   );
 });

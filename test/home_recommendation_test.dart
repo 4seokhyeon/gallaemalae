@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gallaemalae/domain/entities/favorite_place.dart';
 import 'package:gallaemalae/domain/entities/festival.dart';
+import 'package:gallaemalae/domain/entities/festival_personality.dart';
 import 'package:gallaemalae/features/home/presentation/view_models/home_view_model.dart';
 
 void main() {
@@ -61,5 +62,20 @@ void main() {
     ];
 
     expect(favoriteCategoryCounts(favorites), {FestivalCategory.nature: 2});
+  });
+
+  test('성향과 일치한 대표 축제의 구체적인 추천 이유를 만든다', () {
+    final reason = homeRecommendationReason(
+      festival(1, FestivalCategory.performance, 1),
+      personality: FestivalPersonality(
+        type: FestivalPersonalityType.energeticExplorer,
+        answers: const [0, 0, 0, 0, 0],
+        completedAt: DateTime(2026),
+      ),
+      favoriteCategoryCounts: const {},
+    );
+
+    expect(reason, contains('활기찬 탐험가'));
+    expect(reason, contains('공연 유형'));
   });
 }

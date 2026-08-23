@@ -108,4 +108,11 @@ class DriftUserActivityRepository implements UserActivityRepository {
           AppSettingsCompanion.insert(key: key, value: value),
         );
   }
+
+  @override
+  Future<void> deleteSetting(String key) {
+    return (_database.delete(
+      _database.appSettings,
+    )..where((row) => row.key.equals(key))).go();
+  }
 }

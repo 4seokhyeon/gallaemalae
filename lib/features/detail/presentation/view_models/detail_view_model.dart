@@ -19,13 +19,8 @@ class DetailViewModel
   Future<DetailViewState> build(int festivalId) async {
     final repository = ref.watch(festivalRepositoryProvider);
     final festival = await repository.getDetail(festivalId);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final analysisDate = today.isBefore(festival.startDate)
-        ? festival.startDate
-        : today.isAfter(festival.endDate)
-        ? festival.endDate
-        : today;
+    // TODO: 서버의 과거 혼잡도 응답 확인 후 방문일 기반 날짜로 복원합니다.
+    final analysisDate = DateTime(2026, 7, 19);
     final analysis = await repository.analyze(festivalId, analysisDate);
     return DetailViewState(festival: festival, analysis: analysis);
   }

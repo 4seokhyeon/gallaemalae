@@ -86,8 +86,7 @@ class AnalysisPage extends ConsumerWidget {
           top: false,
           child: Column(
             children: [
-              SizedBox(
-                height: 260,
+              Expanded(
                 child: CupertinoDatePicker(
                   mode: CupertinoDatePickerMode.date,
                   initialDateTime: initialDate,

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide DayPeriod;
 import 'package:flutter/services.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,6 +33,7 @@ class _MapPageState extends ConsumerState<MapPage> {
   bool _wasMapRouteActive = false;
   bool _locationRequestInProgress = false;
   int _locationRequestGeneration = 0;
+  final Map<String, NOverlayImage> _crowdMarkerIcons = {};
 
   @override
   void didChangeDependencies() {
@@ -83,7 +84,6 @@ class _MapPageState extends ConsumerState<MapPage> {
 
     if (status.isGranted) {
       final repository = ref.read(locationRepositoryProvider);
-      controller.setLocationTrackingMode(NLocationTrackingMode.follow);
       try {
         if (!await repository.isServiceEnabled() ||
             !_isMapControllerActive(controller, requestGeneration)) {
@@ -152,14 +152,7 @@ class _MapPageState extends ConsumerState<MapPage> {
   void _stopMapLocationTracking() {
     _locationRequestGeneration++;
     _locationRequestInProgress = false;
-    final controller = _mapController;
     _mapController = null;
-    if (controller == null) return;
-    try {
-      controller.setLocationTrackingMode(NLocationTrackingMode.none);
-    } on MissingPluginException {
-      // 네이티브 PlatformView가 이미 정리된 경우 추가 호출을 하지 않습니다.
-    }
   }
 
   Future<void> _updateCamera(
@@ -199,32 +192,59 @@ class _MapPageState extends ConsumerState<MapPage> {
     try {
       await controller.clearOverlays(type: NOverlayType.marker);
       if (!identical(_mapController, controller)) return;
-      final markers = festivals
-          .where(
-            (festival) =>
-                festival.latitude >= -90 &&
-                festival.latitude <= 90 &&
-                festival.longitude >= -180 &&
-                festival.longitude <= 180,
-          )
-          .map(
-            (festival) =>
-                NMarker(
-                  id: 'festival_${festival.id}',
-                  position: NLatLng(festival.latitude, festival.longitude),
-                  iconTintColor: _markerColor(festival.category),
-                  caption: NOverlayCaption(text: festival.title),
-                )..setOnTapListener((_) {
-                  ref
-                      .read(mapViewModelProvider.notifier)
-                      .selectFestival(festival.id);
-                }),
-          )
-          .toSet();
+      final analyses = ref.read(mapViewModelProvider).analyses;
+      final markers = <NMarker>{};
+      for (final festival in festivals.where(
+        (festival) =>
+            festival.latitude >= -90 &&
+            festival.latitude <= 90 &&
+            festival.longitude >= -180 &&
+            festival.longitude <= 180,
+      )) {
+        final analysis = analyses[festival.id];
+        final icon = analysis == null ? null : await _crowdMarkerIcon(analysis);
+        if (!identical(_mapController, controller)) return;
+        final marker =
+            NMarker(
+              id: 'festival_${festival.id}',
+              position: NLatLng(festival.latitude, festival.longitude),
+              icon: icon,
+              size: icon == null ? NMarker.autoSize : const Size(48, 54),
+              iconTintColor: icon == null
+                  ? const Color(0xFF777C85)
+                  : Colors.transparent,
+              caption: NOverlayCaption(text: festival.title),
+              captionOffset: 4,
+            )..setOnTapListener((_) {
+              unawaited(
+                ref
+                    .read(mapViewModelProvider.notifier)
+                    .selectFestival(festival.id),
+              );
+            });
+        markers.add(marker);
+      }
       if (markers.isNotEmpty) await controller.addOverlayAll(markers);
     } on MissingPluginException {
       // PlatformView가 정리된 뒤 도착한 비동기 결과는 무시합니다.
     }
+  }
+
+  Future<NOverlayImage> _crowdMarkerIcon(FestivalAnalysis analysis) {
+    final key = '${analysis.overall.level.name}_${analysis.overall.score}';
+    final cached = _crowdMarkerIcons[key];
+    if (cached != null) return Future.value(cached);
+    return NOverlayImage.fromWidget(
+      context: context,
+      size: const Size(48, 54),
+      widget: _CrowdScoreMarker(
+        score: analysis.overall.score,
+        color: _crowdColor(analysis.overall.level),
+      ),
+    ).then((image) {
+      _crowdMarkerIcons[key] = image;
+      return image;
+    });
   }
 
   @override
@@ -237,6 +257,20 @@ class _MapPageState extends ConsumerState<MapPage> {
         final controller = _mapController;
         if (controller != null) {
           unawaited(_syncFestivalMarkers(controller, festivals));
+        }
+      },
+    );
+    ref.listen<Map<int, FestivalAnalysis>>(
+      mapViewModelProvider.select((value) => value.analyses),
+      (_, _) {
+        final controller = _mapController;
+        if (controller != null) {
+          unawaited(
+            _syncFestivalMarkers(
+              controller,
+              ref.read(mapViewModelProvider).visibleFestivals,
+            ),
+          );
         }
       },
     );
@@ -306,7 +340,7 @@ class _MapPageState extends ConsumerState<MapPage> {
                 right: horizontalPadding,
                 bottom: state.selectedFestivalId == null
                     ? navigationInset + 18
-                    : cardBottom + 300,
+                    : cardBottom + 370,
                 child: Column(
                   children: [
                     _RoundMapButton(
@@ -325,6 +359,8 @@ class _MapPageState extends ConsumerState<MapPage> {
                 bottom: cardBottom,
                 child: _FestivalPredictionCard(
                   festival: state.selectedFestival!,
+                  analysis: state.selectedAnalysis,
+                  isAnalyzing: state.isSelectedFestivalAnalyzing,
                   onClose: viewModel.clearSelectedFestival,
                   onTap: () => context.push(
                     AppRoutes.detail(state.selectedFestivalId!.toString()),
@@ -686,11 +722,15 @@ class _FestivalPredictionCard extends StatelessWidget {
     required this.festival,
     required this.onClose,
     required this.onTap,
+    required this.analysis,
+    required this.isAnalyzing,
   });
 
   final FestivalSummary festival;
   final VoidCallback onClose;
   final VoidCallback onTap;
+  final FestivalAnalysis? analysis;
+  final bool isAnalyzing;
 
   @override
   Widget build(BuildContext context) {
@@ -752,6 +792,39 @@ class _FestivalPredictionCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 5),
+              if (analysis != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _crowdColor(
+                      analysis!.overall.level,
+                    ).withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '${analysis!.overall.score}',
+                        style: TextStyle(
+                          color: _crowdColor(analysis!.overall.level),
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        _crowdLabel(analysis!.overall.level),
+                        style: TextStyle(
+                          color: _crowdColor(analysis!.overall.level),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               GestureDetector(
                 onTap: onClose,
                 child: const Padding(
@@ -761,11 +834,44 @@ class _FestivalPredictionCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 17),
-          const Text(
-            '방문 날짜를 선택하면 시간대별 예상 혼잡도를 확인할 수 있어요.',
-            style: TextStyle(color: _muted, fontSize: 13, height: 1.4),
-          ),
+          const SizedBox(height: 14),
+          if (isAnalyzing)
+            const Row(
+              children: [
+                CupertinoActivityIndicator(),
+                SizedBox(width: 9),
+                Text('혼잡도를 분석하고 있어요…'),
+              ],
+            )
+          else if (analysis == null)
+            const Text(
+              '이 축제의 혼잡도 데이터가 아직 없어요. 상세 화면에서 날짜를 선택해 분석할 수 있어요.',
+              style: TextStyle(color: _muted, fontSize: 13, height: 1.4),
+            )
+          else ...[
+            Row(
+              children: [
+                const Text(
+                  '시간대별 혼잡 예측',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                Text(
+                  '추천 ${_periodLabel(analysis!.recommendedPeriod)}',
+                  style: const TextStyle(color: _brand, fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            _TimeSlotBars(slots: analysis!.timeSlots),
+            const SizedBox(height: 6),
+            Text(
+              analysis!.freshness == DataFreshness.stale
+                  ? '저장된 분석 데이터 · 네트워크 연결 후 갱신됩니다'
+                  : '예측 신뢰도 ${(analysis!.confidence * 100).round()}%',
+              style: const TextStyle(color: _muted, fontSize: 10),
+            ),
+          ],
           const SizedBox(height: 17),
           GestureDetector(
             onTap: onTap,
@@ -799,13 +905,100 @@ class _FestivalPredictionCard extends StatelessWidget {
   }
 }
 
-Color _markerColor(FestivalCategory category) => switch (category) {
-  FestivalCategory.culture => const Color(0xFF6C4ED9),
-  FestivalCategory.nature => const Color(0xFF098966),
-  FestivalCategory.food => const Color(0xFFFF6838),
-  FestivalCategory.performance => const Color(0xFFD21F54),
-  FestivalCategory.tradition => const Color(0xFF9A6427),
-  FestivalCategory.other => const Color(0xFF4E5968),
+class _TimeSlotBars extends StatelessWidget {
+  const _TimeSlotBars({required this.slots});
+  final List<TimeSlotPrediction> slots;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 58,
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (final slot in slots) ...[
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Container(
+                  height: 10 + slot.score * .32,
+                  decoration: BoxDecoration(
+                    color: _crowdColor(slot.level),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _periodLabel(slot.period),
+                  style: const TextStyle(fontSize: 9, color: _muted),
+                ),
+              ],
+            ),
+          ),
+          if (slot != slots.last) const SizedBox(width: 7),
+        ],
+      ],
+    ),
+  );
+}
+
+class _CrowdScoreMarker extends StatelessWidget {
+  const _CrowdScoreMarker({required this.score, required this.color});
+  final int score;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    alignment: Alignment.topCenter,
+    children: [
+      Positioned(
+        top: 5,
+        child: Transform.rotate(
+          angle: .785,
+          child: Container(width: 30, height: 30, color: color),
+        ),
+      ),
+      Container(
+        width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 3),
+          boxShadow: const [BoxShadow(color: Color(0x44000000), blurRadius: 8)],
+        ),
+        child: Text(
+          '$score',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+Color _crowdColor(CrowdLevel level) => switch (level) {
+  CrowdLevel.low => const Color(0xFF1FA97A),
+  CrowdLevel.medium => const Color(0xFFFF8A34),
+  CrowdLevel.high => const Color(0xFFE34A33),
+  CrowdLevel.veryHigh => const Color(0xFFBD171C),
+};
+
+String _crowdLabel(CrowdLevel level) => switch (level) {
+  CrowdLevel.low => '여유',
+  CrowdLevel.medium => '보통',
+  CrowdLevel.high => '혼잡',
+  CrowdLevel.veryHigh => '매우 혼잡',
+};
+
+String _periodLabel(DayPeriod period) => switch (period) {
+  DayPeriod.morning => '오전',
+  DayPeriod.afternoon => '오후',
+  DayPeriod.evening => '저녁',
 };
 
 String _categoryLabel(FestivalCategory category) => switch (category) {

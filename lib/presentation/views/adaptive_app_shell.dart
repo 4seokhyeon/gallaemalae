@@ -41,6 +41,20 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
   }
 
   Future<bool> _handleAndroidBack() async {
+    final router = GoRouter.of(context);
+    final currentPath = router.routerDelegate.currentConfiguration.uri.path;
+    if (router.canPop()) {
+      _lastBackPressedAt = null;
+      router.pop();
+      return true;
+    }
+
+    if (!_tabPaths.contains(currentPath)) {
+      _lastBackPressedAt = null;
+      context.go(AppRoutes.home);
+      return true;
+    }
+
     if (widget.currentIndex != 0) {
       _lastBackPressedAt = null;
       context.go(AppRoutes.home);

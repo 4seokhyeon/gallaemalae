@@ -4,25 +4,60 @@ import 'package:gallaemalae/data/local/app_database.dart';
 import 'package:gallaemalae/data/repositories/drift_personality_repository.dart';
 import 'package:gallaemalae/data/repositories/drift_user_activity_repository.dart';
 import 'package:gallaemalae/domain/entities/favorite_place.dart' as domain;
+import 'package:gallaemalae/domain/entities/festival.dart';
 import 'package:gallaemalae/domain/entities/visit.dart' as domain;
 import 'package:gallaemalae/domain/entities/festival_personality.dart';
 
 void main() {
+  test('4문항 추천 성향을 API 필터 값으로 변환한다', () {
+    final personality = FestivalPersonality(
+      type: FestivalPersonalityType.energeticExplorer,
+      answers: const [6, 0, 2, 1],
+      completedAt: DateTime(2026),
+      preferredCategories: const {
+        FestivalCategory.food,
+        FestivalCategory.performance,
+      },
+      crowdPreference: FestivalCrowdPreference.lively,
+      preferredPeriod: DayPeriod.evening,
+      travelScope: FestivalTravelScope.nearby,
+    );
+
+    expect(personality.apiCategories, {
+      FestivalCategory.food,
+      FestivalCategory.performance,
+    });
+    expect(personality.crowdLabel, '활기찬 인파');
+    expect(personality.periodLabel, '저녁');
+    expect(personality.travelScopeLabel, '인접 지역');
+  });
+
   test('Drift에 축제 성향을 저장하고 다시 불러온다', () async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = DriftPersonalityRepository(database);
     final personality = FestivalPersonality(
       type: FestivalPersonalityType.energeticExplorer,
-      answers: const [0, 1, 0, 0, 1],
+      answers: const [6, 0, 2, 1],
       completedAt: DateTime(2026, 8, 4),
+      preferredCategories: const {
+        FestivalCategory.food,
+        FestivalCategory.performance,
+      },
+      crowdPreference: FestivalCrowdPreference.lively,
+      preferredPeriod: DayPeriod.evening,
+      travelScope: FestivalTravelScope.nearby,
     );
 
     await repository.save(personality);
     final restored = await repository.load();
 
     expect(restored?.type, FestivalPersonalityType.energeticExplorer);
-    expect(restored?.answers, [0, 1, 0, 0, 1]);
+    expect(restored?.answers, [6, 0, 2, 1]);
+    expect(restored?.preferredCategories, {
+      FestivalCategory.food,
+      FestivalCategory.performance,
+    });
     expect(restored?.apiCode, 'ENERGETIC_EXPLORER');
   });
 

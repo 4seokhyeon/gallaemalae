@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gallaemalae/core/layout/app_layout.dart';
 import 'package:gallaemalae/core/navigation/tab_reselection.dart';
 import 'package:gallaemalae/core/router/app_routes.dart';
+import 'package:gallaemalae/data/repositories/repository_providers.dart';
 import 'package:gallaemalae/domain/entities/favorite_place.dart';
 import 'package:gallaemalae/domain/entities/festival_personality.dart';
 import 'package:gallaemalae/domain/entities/visit.dart';
 import 'package:gallaemalae/features/favorites/presentation/view_models/favorites_view_model.dart';
+import 'package:gallaemalae/features/analysis/presentation/view_models/analysis_view_model.dart';
 import 'package:gallaemalae/features/personality/presentation/view_models/personality_view_model.dart';
 import 'package:gallaemalae/features/visits/presentation/view_models/visit_plans_view_model.dart';
 import 'package:gallaemalae/features/onboarding/presentation/view_models/user_name_view_model.dart';
@@ -27,14 +29,19 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
-  bool _crowdAlerts = true;
-
   @override
   Widget build(BuildContext context) {
     final personality = ref.watch(personalityProvider).value;
     final favorites = ref.watch(favoritePlacesProvider);
     final userName = ref.watch(userNameProvider).valueOrNull ?? '사용자';
     final visitPlans = ref.watch(visitPlansProvider);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final planItems = visitPlans.valueOrNull ?? const <Visit>[];
+    final upcomingCount = planItems
+        .where((visit) => !visit.visitedAt.isBefore(today))
+        .length;
+    final pastCount = planItems.length - upcomingCount;
     final body = ReselectableTabScrollView(
       tabIndex: 3,
       builder: (controller) => CustomScrollView(
@@ -50,27 +57,39 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             ),
             sliver: SliverList.list(
               children: [
-                _UserCard(name: userName),
-                const SizedBox(height: 20),
-                _PersonalityCard(personality: personality, onRetest: _retest),
+                _UserCard(
+                  name: userName,
+                  personality: personality,
+                  onEditName: () => _editName(userName),
+                  onRetest: _retest,
+                ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    const Expanded(
-                      child: _StatCard(
-                        label: '내 제보 횟수',
-                        value: '48',
-                        unit: '회',
-                        color: Color(0xFF1359E8),
-                      ),
-                    ),
-                    SizedBox(width: 14),
                     Expanded(
                       child: _StatCard(
                         label: '관심 축제',
                         value: '${favorites.valueOrNull?.length ?? 0}',
                         unit: '곳',
                         color: _brand,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatCard(
+                        label: '방문 예정',
+                        value: '$upcomingCount',
+                        unit: '건',
+                        color: const Color(0xFF1359E8),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatCard(
+                        label: '지난 일정',
+                        value: '$pastCount',
+                        unit: '건',
+                        color: _muted,
                       ),
                     ),
                   ],
@@ -95,15 +114,25 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 const SizedBox(height: 15),
                 _VisitPlansPreview(plans: visitPlans),
                 const SizedBox(height: 28),
+                _PersonalityCard(personality: personality, onRetest: _retest),
+                const SizedBox(height: 28),
                 const _SectionTitle(
                   icon: Icons.settings_outlined,
-                  title: '앱 설정 및 데이터 최적화',
+                  title: '데이터 및 설정',
                 ),
                 const SizedBox(height: 13),
                 _SettingsCard(
-                  crowdAlerts: _crowdAlerts,
-                  onAlertsChanged: (value) =>
-                      setState(() => _crowdAlerts = value),
+                  onEditName: () => _editName(userName),
+                  onClearSearches: _clearRecentSearches,
+                  onClearFavorites: () => _clearFavorites(
+                    favorites.valueOrNull ?? const <FavoritePlace>[],
+                  ),
+                  onClearPlans: () => _clearPlans(planItems),
+                  onClearCache: _clearCache,
+                  onResetAll: () => _resetAll(
+                    favorites.valueOrNull ?? const <FavoritePlace>[],
+                    planItems,
+                  ),
                 ),
               ],
             ),
@@ -126,6 +155,175 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   void _retest() {
     ref.read(personalityTestControllerProvider.notifier).reset();
     context.push(AppRoutes.personalityTest);
+  }
+
+  Future<void> _editName(String currentName) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => _EditNameDialog(initialName: currentName),
+    );
+    if (name != null) await ref.read(userNameProvider.notifier).save(name);
+  }
+
+  Future<bool> _confirm(String title, String message) async =>
+      await showAdaptiveDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog.adaptive(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('삭제'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  Future<void> _clearRecentSearches() async {
+    if (!await _confirm('최근 검색어 삭제', '저장된 최근 검색어를 모두 삭제할까요?')) return;
+    await ref
+        .read(userActivityRepositoryProvider)
+        .writeSetting('recent_festival_searches_v1', '[]');
+  }
+
+  Future<void> _clearFavorites(List<FavoritePlace> favorites) async {
+    if (favorites.isEmpty ||
+        !await _confirm('관심 축제 삭제', '저장한 관심 축제를 모두 삭제할까요?')) {
+      return;
+    }
+    await ref.read(favoritesControllerProvider.notifier).clear(favorites);
+  }
+
+  Future<void> _clearPlans(List<Visit> plans) async {
+    if (plans.isEmpty || !await _confirm('방문 일정 삭제', '저장한 방문 일정을 모두 삭제할까요?')) {
+      return;
+    }
+    for (final plan in plans) {
+      await ref
+          .read(visitPlansControllerProvider.notifier)
+          .remove(int.parse(plan.placeId));
+    }
+  }
+
+  Future<void> _clearCache() async {
+    if (!await _confirm('캐시 삭제', '저장된 축제 API 데이터를 삭제할까요?')) return;
+    await ref.read(festivalCacheStoreProvider).clear();
+  }
+
+  Future<void> _resetAll(
+    List<FavoritePlace> favorites,
+    List<Visit> plans,
+  ) async {
+    if (!await _confirm('앱 데이터 초기화', '이름, 성향, 관심 축제와 방문 일정을 모두 삭제할까요?')) {
+      return;
+    }
+    await ref.read(favoritesControllerProvider.notifier).clear(favorites);
+    for (final plan in plans) {
+      await ref
+          .read(visitPlansControllerProvider.notifier)
+          .remove(int.parse(plan.placeId));
+    }
+    final repository = ref.read(userActivityRepositoryProvider);
+    await repository.deleteSetting('user_name_v1');
+    await repository.deleteSetting('festival_personality_v1');
+    await repository.deleteSetting('recent_festival_searches_v1');
+    await repository.deleteSetting(analysisSelectionSettingKey);
+    await ref.read(festivalCacheStoreProvider).clear();
+    ref.invalidate(userNameProvider);
+    ref.invalidate(personalityProvider);
+    if (mounted) context.go(AppRoutes.nameEntry);
+  }
+}
+
+class _EditNameDialog extends StatefulWidget {
+  const _EditNameDialog({required this.initialName});
+  final String initialName;
+
+  @override
+  State<_EditNameDialog> createState() => _EditNameDialogState();
+}
+
+class _EditNameDialogState extends State<_EditNameDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+    _controller.addListener(_refresh);
+  }
+
+  void _refresh() => setState(() {});
+
+  void _save() {
+    final value = _controller.text.trim();
+    if (value.isNotEmpty) Navigator.pop(context, value);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_refresh);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canSave = _controller.text.trim().isNotEmpty;
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return CupertinoAlertDialog(
+        title: const Text('이름 변경'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: CupertinoTextField(
+            controller: _controller,
+            autofocus: true,
+            maxLength: 20,
+            placeholder: '이름',
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => canSave ? _save() : null,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          CupertinoDialogAction(
+            onPressed: canSave ? _save : null,
+            isDefaultAction: true,
+            child: const Text('저장'),
+          ),
+        ],
+      );
+    }
+    return AlertDialog(
+      title: const Text('이름 변경'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 20,
+        textInputAction: TextInputAction.done,
+        decoration: const InputDecoration(labelText: '이름'),
+        onSubmitted: (_) => canSave ? _save() : null,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('취소'),
+        ),
+        FilledButton(
+          onPressed: canSave ? _save : null,
+          child: const Text('저장'),
+        ),
+      ],
+    );
   }
 }
 
@@ -158,8 +356,16 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _UserCard extends StatelessWidget {
-  const _UserCard({required this.name});
+  const _UserCard({
+    required this.name,
+    required this.personality,
+    required this.onEditName,
+    required this.onRetest,
+  });
   final String name;
+  final FestivalPersonality? personality;
+  final VoidCallback onEditName;
+  final VoidCallback onRetest;
   @override
   Widget build(BuildContext context) => _WhiteCard(
     child: Row(
@@ -182,45 +388,24 @@ class _UserCard extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Wrap(
-                spacing: 6,
-                children: [
-                  _MiniTag('축제 매니아', Color(0xFF1359E8)),
-                  _MiniTag('혼잡도 탐지기', _brand),
-                ],
+              const SizedBox(height: 5),
+              Text(
+                personality?.shortTitle ?? '성향 테스트 전',
+                style: const TextStyle(color: _muted, fontSize: 12),
               ),
-              const SizedBox(height: 10),
-              const LinearProgressIndicator(
-                value: .58,
-                minHeight: 6,
-                color: _orange,
-                backgroundColor: Color(0xFFE4E4E7),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 4,
+                children: [
+                  TextButton(onPressed: onEditName, child: const Text('이름 변경')),
+                  TextButton(onPressed: onRetest, child: const Text('성향 재검사')),
+                ],
               ),
             ],
           ),
         ),
         const SizedBox(width: 10),
-        const Icon(Icons.settings_suggest_outlined, color: Color(0xFF5F514D)),
       ],
-    ),
-  );
-}
-
-class _MiniTag extends StatelessWidget {
-  const _MiniTag(this.text, this.color);
-  final String text;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: .10),
-      borderRadius: BorderRadius.circular(5),
-    ),
-    child: Text(
-      text,
-      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600),
     ),
   );
 }
@@ -338,7 +523,7 @@ class _StatCard extends StatelessWidget {
                 text: value,
                 style: TextStyle(
                   color: color,
-                  fontSize: 38,
+                  fontSize: 28,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -624,49 +809,59 @@ String _visitDate(DateTime value) =>
 
 class _SettingsCard extends StatelessWidget {
   const _SettingsCard({
-    required this.crowdAlerts,
-    required this.onAlertsChanged,
+    required this.onEditName,
+    required this.onClearSearches,
+    required this.onClearFavorites,
+    required this.onClearPlans,
+    required this.onClearCache,
+    required this.onResetAll,
   });
-  final bool crowdAlerts;
-  final ValueChanged<bool> onAlertsChanged;
+  final VoidCallback onEditName;
+  final VoidCallback onClearSearches;
+  final VoidCallback onClearFavorites;
+  final VoidCallback onClearPlans;
+  final VoidCallback onClearCache;
+  final VoidCallback onResetAll;
   @override
   Widget build(BuildContext context) => _WhiteCard(
     padding: EdgeInsets.zero,
     child: Column(
       children: [
         _SettingRow(
-          icon: Icons.notifications_active_outlined,
-          title: '실시간 혼잡도 알림',
-          subtitle: '관심 축제가 혼잡해지면 즉시 알림',
-          trailing: _PlatformSettingsSwitch(
-            value: crowdAlerts,
-            onChanged: onAlertsChanged,
-          ),
+          icon: Icons.badge_outlined,
+          title: '이름 변경',
+          onTap: onEditName,
         ),
         const Divider(height: 1),
-        const _SettingRow(
-          icon: Icons.analytics_outlined,
-          title: '데이터 분석 기준 설정',
-          subtitle: '15분 단위 분석',
-          trailing: Text(
-            '15분',
-            style: TextStyle(
-              color: Color(0xFF1359E8),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+        _SettingRow(
+          icon: Icons.search_off_rounded,
+          title: '최근 검색어 삭제',
+          onTap: onClearSearches,
         ),
         const Divider(height: 1),
-        const _SettingRow(
-          icon: Icons.shield_outlined,
-          title: '개인정보 및 위치 데이터',
-          trailing: Icon(Icons.chevron_right_rounded),
+        _SettingRow(
+          icon: Icons.heart_broken_outlined,
+          title: '관심 축제 전체 삭제',
+          onTap: onClearFavorites,
         ),
         const Divider(height: 1),
-        const _SettingRow(
-          icon: Icons.logout_rounded,
-          title: '로그아웃',
+        _SettingRow(
+          icon: Icons.event_busy_outlined,
+          title: '방문 일정 전체 삭제',
+          onTap: onClearPlans,
+        ),
+        const Divider(height: 1),
+        _SettingRow(
+          icon: Icons.cleaning_services_outlined,
+          title: '오프라인 캐시 삭제',
+          onTap: onClearCache,
+        ),
+        const Divider(height: 1),
+        _SettingRow(
+          icon: Icons.delete_forever_outlined,
+          title: '앱 데이터 전체 초기화',
           titleColor: Colors.red,
+          onTap: onResetAll,
         ),
       ],
     ),
@@ -677,71 +872,49 @@ class _SettingRow extends StatelessWidget {
   const _SettingRow({
     required this.icon,
     required this.title,
-    this.subtitle,
-    this.trailing,
     this.titleColor = _ink,
+    this.onTap,
   });
   final IconData icon;
   final String title;
-  final String? subtitle;
-  final Widget? trailing;
   final Color titleColor;
+  final VoidCallback? onTap;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-    child: Row(
-      children: [
-        Icon(
-          icon,
-          color: titleColor == Colors.red
-              ? Colors.red
-              : const Color(0xFF66504A),
-          size: 22,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: titleColor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (subtitle != null)
-                Text(
-                  subtitle!,
-                  style: const TextStyle(color: _muted, fontSize: 10),
-                ),
-            ],
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: titleColor == Colors.red
+                ? Colors.red
+                : const Color(0xFF66504A),
+            size: 22,
           ),
-        ),
-        ?trailing,
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: titleColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (onTap != null) const Icon(Icons.chevron_right_rounded),
+        ],
+      ),
     ),
   );
-}
-
-class _PlatformSettingsSwitch extends StatelessWidget {
-  const _PlatformSettingsSwitch({required this.value, required this.onChanged});
-
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return CupertinoSwitch(
-        value: value,
-        activeTrackColor: _brand,
-        onChanged: onChanged,
-      );
-    }
-    return Switch(value: value, activeTrackColor: _brand, onChanged: onChanged);
-  }
 }
 
 class _WhiteCard extends StatelessWidget {

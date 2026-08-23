@@ -16,11 +16,14 @@ abstract class HomeViewState with _$HomeViewState {
     @Default(false) bool isRefreshing,
     FestivalPage? festivals,
     String? errorMessage,
+    String? recommendationNotice,
     @Default('30일 이내 방문할 수 있는 축제예요.') String recommendationReason,
   }) = _HomeViewState;
 }
 
 class HomeViewModel extends AutoDisposeNotifier<HomeViewState> {
+  Future<void>? _activeRefresh;
+
   @override
   HomeViewState build() {
     ref.watch(personalityProvider);
@@ -38,30 +41,82 @@ class HomeViewModel extends AutoDisposeNotifier<HomeViewState> {
     };
   }
 
-  Future<void> refresh() async {
-    state = state.copyWith(isRefreshing: true, errorMessage: null);
+  Future<void> refresh() {
+    final active = _activeRefresh;
+    if (active != null) return active;
+    final future = _performRefresh();
+    _activeRefresh = future;
+    return future.whenComplete(() {
+      if (identical(_activeRefresh, future)) _activeRefresh = null;
+    });
+  }
+
+  Future<void> _performRefresh() async {
+    state = state.copyWith(
+      isRefreshing: true,
+      errorMessage: null,
+      recommendationNotice: null,
+    );
     try {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final until = today.add(const Duration(days: 30));
       final personality = ref.read(personalityProvider).value;
-      final preferredCategorySet = preferredCategories(personality?.type);
+      final preferredCategorySet = personality == null
+          ? const <FestivalCategory>{}
+          : personality.hasRecommendationProfile
+          ? personality.apiCategories
+          : preferredCategories(personality.type);
       final favorites =
           ref.read(favoritePlacesProvider).valueOrNull ??
           const <FavoritePlace>[];
       final favoriteCategories = favoriteCategoryCounts(favorites);
       final repository = ref.read(festivalRepositoryProvider);
-      final response = await repository.search(
+      final requestedCategories = personality?.hasRecommendationProfile ?? false
+          ? personality!.apiCategories
+          : const <FestivalCategory>{};
+      var windowDays = 30;
+      String? recommendationNotice;
+      var response = await repository.search(
         from: today,
-        to: until,
+        to: today.add(const Duration(days: 30)),
+        categories: requestedCategories,
         size: 20,
       );
+      if (response.items.isEmpty && requestedCategories.isNotEmpty) {
+        windowDays = 90;
+        recommendationNotice = '선호한 유형의 축제가 없어 기간을 90일까지 넓혔어요.';
+        response = await repository.search(
+          from: today,
+          to: today.add(const Duration(days: 90)),
+          categories: requestedCategories,
+          size: 20,
+        );
+      }
+      if (response.items.isEmpty && requestedCategories.isNotEmpty) {
+        windowDays = 30;
+        recommendationNotice = '선호 조건에 맞는 축제가 없어 다른 유형까지 함께 추천해요.';
+        response = await repository.search(
+          from: today,
+          to: today.add(const Duration(days: 30)),
+          size: 20,
+        );
+      }
+      if (response.items.isEmpty && windowDays < 90) {
+        windowDays = 90;
+        recommendationNotice = '가까운 일정의 축제가 없어 전체 유형을 90일까지 넓혀 찾았어요.';
+        response = await repository.search(
+          from: today,
+          to: today.add(const Duration(days: 90)),
+          size: 20,
+        );
+      }
       final ranked = rankHomeRecommendations(
         response.items,
         preferredCategories: preferredCategorySet,
         favoriteCategoryCounts: favoriteCategories,
       ).take(3).toList();
       final festivals = response.copyWith(items: ranked);
+      final featuredFestival = festivals.items.firstOrNull;
       final hasFavoritePreference = favoriteCategories.isNotEmpty;
       state = state.copyWith(
         summary: festivals.items.isEmpty
@@ -69,11 +124,15 @@ class HomeViewModel extends AutoDisposeNotifier<HomeViewState> {
             : preferredCategorySet.isEmpty && !hasFavoritePreference
             ? '지금 방문하기 좋은 축제를 찾았어요'
             : '내 취향과 가까운 축제를 찾았어요',
-        recommendationReason: hasFavoritePreference
-            ? '내 관심 축제와 비슷한 유형을 우선하고 성향 검사 결과를 함께 반영했어요.'
-            : preferredCategorySet.isNotEmpty
-            ? '성향 검사에서 선호한 유형과 30일 이내 방문 가능 여부를 반영했어요.'
-            : '30일 이내 방문할 수 있는 축제를 가까운 일정순으로 추천해요.',
+        recommendationReason: featuredFestival == null
+            ? '30일 이내 방문할 수 있는 축제를 찾고 있어요.'
+            : homeRecommendationReason(
+                featuredFestival,
+                personality: personality,
+                favoriteCategoryCounts: favoriteCategories,
+                windowDays: windowDays,
+              ),
+        recommendationNotice: recommendationNotice,
         festivals: festivals,
         isRefreshing: false,
       );
@@ -85,6 +144,39 @@ class HomeViewModel extends AutoDisposeNotifier<HomeViewState> {
     }
   }
 }
+
+String homeRecommendationReason(
+  FestivalSummary festival, {
+  required FestivalPersonality? personality,
+  required Map<FestivalCategory, int> favoriteCategoryCounts,
+  int windowDays = 30,
+}) {
+  final favoriteCount = favoriteCategoryCounts[festival.category] ?? 0;
+  final categoryLabel = _categoryLabel(festival.category);
+  if (favoriteCount > 0) {
+    return '관심 축제로 저장한 $categoryLabel 유형 $favoriteCount개와 비슷하고, '
+        '$windowDays일 이내 방문할 수 있어 가장 먼저 추천했어요.';
+  }
+  final categories = personality == null
+      ? const <FestivalCategory>{}
+      : personality.hasRecommendationProfile
+      ? personality.apiCategories
+      : preferredCategories(personality.type);
+  if (categories.contains(festival.category)) {
+    return '${personality!.shortTitle} 성향이 선호하는 $categoryLabel 유형이며, '
+        '$windowDays일 이내 방문할 수 있어 추천했어요.';
+  }
+  return '$windowDays일 이내 방문 가능한 축제 중 시작일이 가까워 추천했어요.';
+}
+
+String _categoryLabel(FestivalCategory category) => switch (category) {
+  FestivalCategory.culture => '문화',
+  FestivalCategory.nature => '자연',
+  FestivalCategory.food => '먹거리',
+  FestivalCategory.performance => '공연',
+  FestivalCategory.tradition => '전통',
+  FestivalCategory.other => '기타',
+};
 
 Set<FestivalCategory> preferredCategories(FestivalPersonalityType? type) {
   return switch (type) {
