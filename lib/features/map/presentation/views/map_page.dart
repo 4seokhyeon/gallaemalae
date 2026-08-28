@@ -191,9 +191,11 @@ class _MapPageState extends ConsumerState<MapPage> {
     if (!identical(_mapController, controller)) return;
     try {
       await controller.clearOverlays(type: NOverlayType.marker);
+      await controller.clearOverlays(type: NOverlayType.circleOverlay);
       if (!identical(_mapController, controller)) return;
       final analyses = ref.read(mapViewModelProvider).analyses;
       final markers = <NMarker>{};
+      final crowdAreas = <NCircleOverlay>{};
       for (final festival in festivals.where(
         (festival) =>
             festival.latitude >= -90 &&
@@ -204,16 +206,39 @@ class _MapPageState extends ConsumerState<MapPage> {
         final analysis = analyses[festival.id];
         final icon = analysis == null ? null : await _crowdMarkerIcon(analysis);
         if (!identical(_mapController, controller)) return;
+        if (analysis != null) {
+          final color = _crowdColor(analysis.overall.level);
+          final area =
+              NCircleOverlay(
+                id: 'crowd_area_${festival.id}',
+                center: NLatLng(festival.latitude, festival.longitude),
+                radius: _crowdAreaRadius(analysis.overall.level),
+                color: color.withValues(
+                  alpha: _crowdAreaOpacity(analysis.overall.score),
+                ),
+                outlineColor: color.withValues(alpha: .5),
+                outlineWidth: 1.5,
+              )..setOnTapListener((_) {
+                unawaited(
+                  ref
+                      .read(mapViewModelProvider.notifier)
+                      .selectFestival(festival.id),
+                );
+              });
+          crowdAreas.add(area);
+        }
         final marker =
             NMarker(
               id: 'festival_${festival.id}',
               position: NLatLng(festival.latitude, festival.longitude),
               icon: icon,
-              size: icon == null ? NMarker.autoSize : const Size(48, 54),
+              size: icon == null ? NMarker.autoSize : const Size(88, 38),
               iconTintColor: icon == null
                   ? const Color(0xFF777C85)
                   : Colors.transparent,
-              caption: NOverlayCaption(text: festival.title),
+              caption: analysis == null
+                  ? NOverlayCaption(text: festival.title)
+                  : const NOverlayCaption(text: ''),
               captionOffset: 4,
             )..setOnTapListener((_) {
               unawaited(
@@ -224,6 +249,9 @@ class _MapPageState extends ConsumerState<MapPage> {
             });
         markers.add(marker);
       }
+      if (crowdAreas.isNotEmpty) {
+        await controller.addOverlayAll(crowdAreas);
+      }
       if (markers.isNotEmpty) await controller.addOverlayAll(markers);
     } on MissingPluginException {
       // PlatformView가 정리된 뒤 도착한 비동기 결과는 무시합니다.
@@ -231,14 +259,14 @@ class _MapPageState extends ConsumerState<MapPage> {
   }
 
   Future<NOverlayImage> _crowdMarkerIcon(FestivalAnalysis analysis) {
-    final key = '${analysis.overall.level.name}_${analysis.overall.score}';
+    final key = analysis.overall.level.name;
     final cached = _crowdMarkerIcons[key];
     if (cached != null) return Future.value(cached);
     return NOverlayImage.fromWidget(
       context: context,
-      size: const Size(48, 54),
-      widget: _CrowdScoreMarker(
-        score: analysis.overall.score,
+      size: const Size(88, 38),
+      widget: _CrowdLevelMarker(
+        label: _crowdLabel(analysis.overall.level),
         color: _crowdColor(analysis.overall.level),
       ),
     ).then((image) {
@@ -322,6 +350,13 @@ class _MapPageState extends ConsumerState<MapPage> {
                 left: 0,
                 right: 0,
                 child: _FestivalLoadingIndicator(),
+              ),
+            if (!state.isLoading && state.analyses.isNotEmpty)
+              const Positioned(
+                top: 174,
+                left: 0,
+                right: 0,
+                child: _CrowdMapLegend(),
               ),
             if (state.errorMessage != null)
               Positioned(
@@ -942,44 +977,61 @@ class _TimeSlotBars extends StatelessWidget {
   );
 }
 
-class _CrowdScoreMarker extends StatelessWidget {
-  const _CrowdScoreMarker({required this.score, required this.color});
-  final int score;
+class _CrowdLevelMarker extends StatelessWidget {
+  const _CrowdLevelMarker({required this.label, required this.color});
+  final String label;
   final Color color;
 
   @override
-  Widget build(BuildContext context) => Stack(
-    alignment: Alignment.topCenter,
-    children: [
-      Positioned(
-        top: 5,
-        child: Transform.rotate(
-          angle: .785,
-          child: Container(width: 30, height: 30, color: color),
-        ),
+  Widget build(BuildContext context) => Container(
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.white, width: 2),
+      boxShadow: const [BoxShadow(color: Color(0x44000000), blurRadius: 8)],
+    ),
+    child: Text(
+      label,
+      maxLines: 1,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
       ),
-      Container(
-        width: 44,
-        height: 44,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 3),
-          boxShadow: const [BoxShadow(color: Color(0x44000000), blurRadius: 8)],
-        ),
-        child: Text(
-          '$score',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    ],
+    ),
   );
 }
+
+class _CrowdMapLegend extends StatelessWidget {
+  const _CrowdMapLegend();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .92),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 8)],
+      ),
+      child: const Text(
+        '색이 진할수록 혼잡해요 · 원 크기는 단계 표시용',
+        style: TextStyle(fontSize: 11, color: _muted),
+      ),
+    ),
+  );
+}
+
+double _crowdAreaOpacity(int score) =>
+    (.12 + score.clamp(0, 100) * .0024).clamp(.12, .36).toDouble();
+
+double _crowdAreaRadius(CrowdLevel level) => switch (level) {
+  CrowdLevel.low => 220,
+  CrowdLevel.medium => 300,
+  CrowdLevel.high => 380,
+  CrowdLevel.veryHigh => 460,
+};
 
 Color _crowdColor(CrowdLevel level) => switch (level) {
   CrowdLevel.low => const Color(0xFF1FA97A),
