@@ -346,7 +346,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pump();
 
-    expect(find.text('내 취향 축제 추천'), findsOneWidget);
+    expect(find.text('오늘의 AI 맞춤 추천'), findsOneWidget);
     expect(find.text('뒤로가기를 한 번 더 누르면 앱이 종료됩니다.'), findsOneWidget);
   });
 
@@ -374,7 +374,7 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('내 취향 축제 추천'), findsOneWidget);
+    expect(find.text('오늘의 AI 맞춤 추천'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pump();
@@ -386,7 +386,7 @@ void main() {
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('축제 상세 및 혼잡도 보기'));
+    await tester.tap(find.text('실시간 혼잡도 리포트 보기'));
     await tester.pumpAndSettle();
     expect(find.text('상세 예측'), findsOneWidget);
 
@@ -408,7 +408,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(find.text('내 취향 축제 추천'), findsOneWidget);
+    expect(find.text('오늘의 AI 맞춤 추천'), findsOneWidget);
     expect(find.text('뒤로가기를 한 번 더 누르면 앱이 종료됩니다.'), findsNothing);
   });
 
@@ -429,7 +429,7 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('내 취향 축제 추천'), findsOneWidget);
+    expect(find.text('오늘의 AI 맞춤 추천'), findsOneWidget);
   });
 
   testWidgets('다른 탭에서 돌아오면 화면 스크롤이 맨 위에서 다시 시작한다', (tester) async {
@@ -453,7 +453,7 @@ void main() {
         .position
         .pixels;
     expect(restoredPosition, 0);
-    expect(find.text('내 취향 축제 추천'), findsOneWidget);
+    expect(find.text('오늘의 AI 맞춤 추천'), findsOneWidget);
   });
 
   testWidgets('현재 선택된 탭을 다시 누르면 최상단으로 이동한다', (tester) async {
@@ -550,7 +550,7 @@ void main() {
 
       await _pumpThroughSplash(tester);
 
-      expect(find.text('내 취향 축제 추천'), findsOneWidget);
+      expect(find.text('오늘의 AI 맞춤 추천'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
@@ -698,7 +698,7 @@ void main() {
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('축제 상세 및 혼잡도 보기'));
+    await tester.tap(find.text('실시간 혼잡도 리포트 보기'));
     await tester.pumpAndSettle();
 
     final route = ModalRoute.of(tester.element(find.text('상세 예측')));

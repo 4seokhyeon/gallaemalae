@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide DayPeriod;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gallaemalae/core/layout/app_layout.dart';
 import 'package:gallaemalae/core/navigation/tab_reselection.dart';
@@ -28,6 +28,10 @@ class HomePage extends ConsumerWidget {
     final personality = ref.watch(personalityProvider).value;
     final festivals = homeState.festivals?.items ?? const <FestivalSummary>[];
     final featuredFestival = festivals.isEmpty ? null : festivals.first;
+    final analyses = <int, AsyncValue<FestivalAnalysis?>>{
+      for (final festival in festivals)
+        festival.id: ref.watch(homeFestivalAnalysisProvider(festival)),
+    };
 
     final body = Stack(
       children: [
@@ -47,7 +51,7 @@ class HomePage extends ConsumerWidget {
                 ),
                 sliver: SliverList.list(
                   children: [
-                    const _SectionTitle(icon: '✦', title: '내 취향 축제 추천'),
+                    const _SectionTitle(icon: '✦', title: '오늘의 AI 맞춤 추천'),
                     if (isRetryingFestivalList) ...[
                       const SizedBox(height: 14),
                       const _FestivalRetryNotice(),
@@ -64,6 +68,7 @@ class HomePage extends ConsumerWidget {
                         personalityLabel: personality?.shortTitle ?? '성향 분석 중',
                         festival: featuredFestival,
                         recommendationReason: homeState.recommendationReason,
+                        analysis: analyses[featuredFestival.id]!,
                       ),
                       if (festivals.length > 1) ...[
                         const SizedBox(height: 28),
@@ -91,9 +96,23 @@ class HomePage extends ConsumerWidget {
                       )
                     else
                       for (final festival in festivals.skip(1)) ...[
-                        _ApiFestivalCard(festival: festival),
+                        _ApiFestivalCard(
+                          festival: festival,
+                          analysis: analyses[festival.id]!,
+                        ),
                         const SizedBox(height: 18),
                       ],
+                    if (featuredFestival != null) ...[
+                      const SizedBox(height: 6),
+                      _PredictionGuideCard(
+                        festival: featuredFestival,
+                        analysis: analyses[featuredFestival.id]!,
+                      ),
+                      const SizedBox(height: 18),
+                      _HomeTimeAnalysisCard(
+                        analysis: analyses[featuredFestival.id]!,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -201,11 +220,13 @@ class _HeroRecommendationCard extends StatelessWidget {
     required this.personalityLabel,
     required this.festival,
     required this.recommendationReason,
+    required this.analysis,
   });
 
   final String personalityLabel;
   final FestivalSummary festival;
   final String recommendationReason;
+  final AsyncValue<FestivalAnalysis?> analysis;
 
   @override
   Widget build(BuildContext context) {
@@ -299,9 +320,9 @@ class _HeroRecommendationCard extends StatelessWidget {
                         iconColor: _brand,
                       );
                       final category = _InsightChip(
-                        icon: Icons.category_outlined,
-                        label: '축제 유형',
-                        value: _categoryLabel(festival.category),
+                        icon: Icons.insights_rounded,
+                        label: '혼잡도 예측',
+                        value: _analysisShortLabel(analysis),
                         iconColor: const Color(0xFF0958FF),
                       );
                       if (constraints.maxWidth < 360) {
@@ -350,7 +371,7 @@ class _HeroRecommendationCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 17),
                   _PrimaryButton(
-                    label: '축제 상세 및 혼잡도 보기',
+                    label: '실시간 혼잡도 리포트 보기',
                     onTap: () =>
                         context.push(AppRoutes.detail(festival.id.toString())),
                   ),
@@ -464,7 +485,7 @@ class _TopFestivalsHeader extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         const Text(
-          '다른 추천 축제',
+          '혼잡도 추천 TOP 3',
           style: TextStyle(
             color: _ink,
             fontSize: 18,
@@ -481,9 +502,10 @@ class _TopFestivalsHeader extends StatelessWidget {
 }
 
 class _ApiFestivalCard extends StatelessWidget {
-  const _ApiFestivalCard({required this.festival});
+  const _ApiFestivalCard({required this.festival, required this.analysis});
 
   final FestivalSummary festival;
+  final AsyncValue<FestivalAnalysis?> analysis;
 
   @override
   Widget build(BuildContext context) {
@@ -498,55 +520,294 @@ class _ApiFestivalCard extends StatelessWidget {
       child: InkWell(
         borderRadius: borderRadius,
         onTap: () => context.push(AppRoutes.detail(festival.id.toString())),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 86,
-                  height: 86,
-                  child: _FestivalImage(
-                    url: festival.primaryImageUrl,
-                    fallbackColor: const Color(0xFFDCE8DE),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      festival.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _ink,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 86,
+                      height: 86,
+                      child: _FestivalImage(
+                        url: festival.primaryImageUrl,
+                        fallbackColor: const Color(0xFFDCE8DE),
                       ),
                     ),
-                    const SizedBox(height: 7),
-                    Text(
-                      festival.address,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: _muted, fontSize: 12),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          festival.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          festival.address,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: _muted, fontSize: 12),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${_shortDate(festival.startDate)} – ${_shortDate(festival.endDate)}',
+                          style: const TextStyle(color: _brand, fontSize: 12),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${_shortDate(festival.startDate)} – ${_shortDate(festival.endDate)}',
-                      style: const TextStyle(color: _brand, fontSize: 12),
-                    ),
-                  ],
-                ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        _analysisShortLabel(analysis),
+                        style: TextStyle(
+                          color: _analysisColor(analysis.valueOrNull),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: _muted),
+                    ],
+                  ),
+                ],
               ),
-              const Icon(Icons.chevron_right_rounded, color: _muted),
-            ],
-          ),
+            ),
+            const Divider(height: 1, color: Color(0xFFF1E5E1)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: _PredictionMetrics(analysis: analysis),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _PredictionMetrics extends StatelessWidget {
+  const _PredictionMetrics({required this.analysis});
+  final AsyncValue<FestivalAnalysis?> analysis;
+
+  @override
+  Widget build(BuildContext context) => analysis.when(
+    loading: () => const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 15,
+          height: 15,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        SizedBox(width: 8),
+        Text('혼잡도 예측을 불러오는 중이에요', style: TextStyle(fontSize: 12)),
+      ],
+    ),
+    error: (_, _) => const Text(
+      '혼잡도 분석을 불러오지 못했어요',
+      textAlign: TextAlign.center,
+      style: TextStyle(color: _muted, fontSize: 12),
+    ),
+    data: (value) {
+      if (value == null) {
+        return const Text(
+          '이 날짜의 혼잡도 예측이 아직 준비되지 않았어요',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: _muted, fontSize: 12),
+        );
+      }
+      return Row(
+        children: [
+          Expanded(
+            child: _Metric(value: '${value.overall.score}점', label: '혼잡 점수'),
+          ),
+          const _MetricDivider(),
+          Expanded(
+            child: _Metric(
+              value: _periodLabel(value.recommendedPeriod),
+              label: '추천 시간',
+            ),
+          ),
+          const _MetricDivider(),
+          Expanded(
+            child: _Metric(
+              value: '${(value.confidence * 100).round()}%',
+              label: '예측 신뢰도',
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class _PredictionGuideCard extends StatelessWidget {
+  const _PredictionGuideCard({required this.festival, required this.analysis});
+  final FestivalSummary festival;
+  final AsyncValue<FestivalAnalysis?> analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = analysis.valueOrNull;
+    final title = value == null
+        ? 'AI 혼잡도 예측을 준비하고 있어요'
+        : '${_periodLabel(value.recommendedPeriod)} 방문을 추천해요';
+    final description = value == null
+        ? '서버 분석이 준비되면 ${festival.title}의 추천 시간과 혼잡도를 알려드릴게요.'
+        : '${festival.title}은(는) ${_periodLabel(value.busiestPeriod)}에 가장 붐빌 것으로 보여요. '
+              '예측 신뢰도는 ${(value.confidence * 100).round()}%입니다.';
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE9EEFF),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFBBC8FF)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.auto_graph_rounded, color: Color(0xFF0758FF)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  description,
+                  style: const TextStyle(color: _muted, height: 1.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeTimeAnalysisCard extends StatelessWidget {
+  const _HomeTimeAnalysisCard({required this.analysis});
+  final AsyncValue<FestivalAnalysis?> analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = analysis.valueOrNull;
+    final slots = value?.timeSlots ?? const <TimeSlotPrediction>[];
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
+      decoration: BoxDecoration(
+        color: _brandDark,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26000000),
+            blurRadius: 20,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value == null
+                ? '시간대별 분석을 준비 중입니다'
+                : '${_periodLabel(value.recommendedPeriod)}이 가장 쾌적합니다',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 9),
+          Text(
+            value == null
+                ? '분석 결과가 없어도 축제 목록과 상세 정보는 계속 확인할 수 있어요.'
+                : '${_periodLabel(value.busiestPeriod)}은 가장 혼잡할 것으로 예측됩니다. '
+                      '데이터 상태: ${_freshnessLabel(value.freshness)}',
+            style: const TextStyle(
+              color: Color(0xFFFFD8CA),
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (slots.isNotEmpty)
+            SizedBox(
+              height: 84,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (final slot in slots)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Container(
+                              height: 12 + slot.score * .42,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(
+                                  alpha: .28 + slot.score * .005,
+                                ),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(4),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              _periodLabel(slot.period),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            )
+          else
+            const SizedBox(
+              height: 36,
+              child: LinearProgressIndicator(
+                backgroundColor: Color(0x55FFFFFF),
+                color: Color(0xAAFFFFFF),
+              ),
+            ),
+          const SizedBox(height: 18),
+          FilledButton(
+            onPressed: () => context.go(AppRoutes.analysis),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: _brandDark,
+            ),
+            child: const Text('분석 리포트 전체보기'),
+          ),
+        ],
       ),
     );
   }
@@ -676,13 +937,40 @@ class _HomeEmptyCard extends StatelessWidget {
 
 String _shortDate(DateTime date) => '${date.month}.${date.day}';
 
-String _categoryLabel(FestivalCategory category) => switch (category) {
-  FestivalCategory.culture => '문화',
-  FestivalCategory.nature => '자연',
-  FestivalCategory.food => '먹거리',
-  FestivalCategory.performance => '공연',
-  FestivalCategory.tradition => '전통',
-  FestivalCategory.other => '기타',
+String _analysisShortLabel(AsyncValue<FestivalAnalysis?> analysis) {
+  if (analysis.isLoading) return '분석 중';
+  final value = analysis.valueOrNull;
+  if (value == null) return '예측 준비 중';
+  return '${value.overall.score} · ${_crowdLabel(value.overall.level)}';
+}
+
+Color _analysisColor(FestivalAnalysis? analysis) {
+  if (analysis == null) return _muted;
+  return switch (analysis.overall.level) {
+    CrowdLevel.low => const Color(0xFF098966),
+    CrowdLevel.medium => const Color(0xFFE37418),
+    CrowdLevel.high => const Color(0xFFD94A32),
+    CrowdLevel.veryHigh => const Color(0xFFB91C1C),
+  };
+}
+
+String _crowdLabel(CrowdLevel level) => switch (level) {
+  CrowdLevel.low => '여유',
+  CrowdLevel.medium => '보통',
+  CrowdLevel.high => '혼잡',
+  CrowdLevel.veryHigh => '매우 혼잡',
+};
+
+String _periodLabel(DayPeriod period) => switch (period) {
+  DayPeriod.morning => '오전',
+  DayPeriod.afternoon => '오후',
+  DayPeriod.evening => '저녁',
+};
+
+String _freshnessLabel(DataFreshness freshness) => switch (freshness) {
+  DataFreshness.fresh => '최신 예측',
+  DataFreshness.stale => '저장된 예측',
+  DataFreshness.unavailable => '준비 중',
 };
 
 // Kept for the richer recommendation response planned by the API contract.

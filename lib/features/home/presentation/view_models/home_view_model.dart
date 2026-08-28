@@ -114,7 +114,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeViewState> {
         response.items,
         preferredCategories: preferredCategorySet,
         favoriteCategoryCounts: favoriteCategories,
-      ).take(3).toList();
+      ).take(4).toList();
       final festivals = response.copyWith(items: ranked);
       final featuredFestival = festivals.items.firstOrNull;
       final hasFavoritePreference = favoriteCategories.isNotEmpty;
@@ -236,3 +236,32 @@ final homeViewModelProvider =
     NotifierProvider.autoDispose<HomeViewModel, HomeViewState>(
       HomeViewModel.new,
     );
+
+final homeFestivalAnalysisProvider = FutureProvider.autoDispose
+    .family<FestivalAnalysis?, FestivalSummary>((ref, festival) async {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final start = DateTime(
+        festival.startDate.year,
+        festival.startDate.month,
+        festival.startDate.day,
+      );
+      final end = DateTime(
+        festival.endDate.year,
+        festival.endDate.month,
+        festival.endDate.day,
+      );
+      if (today.isAfter(end)) return null;
+      final date = today.isBefore(start) ? start : today;
+      try {
+        final analysis = await ref
+            .read(festivalRepositoryProvider)
+            .analyze(festival.id, date);
+        return analysis.freshness == DataFreshness.unavailable
+            ? null
+            : analysis;
+      } catch (_) {
+        // 홈 목록은 개별 분석 실패와 관계없이 계속 노출합니다.
+        return null;
+      }
+    });
