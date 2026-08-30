@@ -641,69 +641,76 @@ class _FestivalTile extends StatelessWidget {
   final String match;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
+  Widget build(BuildContext context) => Material(
+    type: MaterialType.transparency,
     borderRadius: BorderRadius.circular(13),
-    child: Container(
-      width: 255,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(13),
-        boxShadow: const [BoxShadow(color: Color(0x0D000000), blurRadius: 12)],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(13),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 125,
-              color: color,
-              child: const Center(
-                child: Icon(
-                  Icons.celebration_rounded,
-                  color: Colors.white,
-                  size: 56,
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Container(
+        width: 255,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(13),
+          boxShadow: const [
+            BoxShadow(color: Color(0x0D000000), blurRadius: 12),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 125,
+                color: color,
+                child: const Center(
+                  child: Icon(
+                    Icons.celebration_rounded,
+                    color: Colors.white,
+                    size: 56,
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      color: const Color(0xFFFFE8DF),
+                      child: Text(
+                        match,
+                        style: const TextStyle(
+                          color: _brand,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                    color: const Color(0xFFFFE8DF),
-                    child: Text(
-                      match,
+                    const SizedBox(height: 5),
+                    Text(
+                      title,
                       style: const TextStyle(
-                        color: _brand,
-                        fontSize: 10,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(color: _muted, fontSize: 10),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: _muted, fontSize: 10),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),

@@ -34,6 +34,10 @@ class _MapPageState extends ConsumerState<MapPage> {
   bool _locationRequestInProgress = false;
   int _locationRequestGeneration = 0;
   final Map<String, NOverlayImage> _crowdMarkerIcons = {};
+  final Map<int, String> _renderedMarkerSignatures = {};
+  final Map<int, NOverlayType> _renderedOverlayTypes = {};
+  Future<void> _markerSyncQueue = Future.value();
+  int _zoomBucket = 2;
 
   @override
   void didChangeDependencies() {
@@ -175,13 +179,41 @@ class _MapPageState extends ConsumerState<MapPage> {
 
   void _handleMapReady(NaverMapController controller) {
     _mapController = controller;
-    unawaited(
-      _syncFestivalMarkers(
-        controller,
-        ref.read(mapViewModelProvider).visibleFestivals,
-      ),
+    _renderedMarkerSignatures.clear();
+    _renderedOverlayTypes.clear();
+    _queueFestivalMarkerSync(
+      controller,
+      ref.read(mapViewModelProvider).visibleFestivals,
     );
     if (_wasMapRouteActive) _moveToCurrentLocation();
+  }
+
+  void _queueFestivalMarkerSync(
+    NaverMapController controller,
+    List<FestivalSummary> festivals,
+  ) {
+    _markerSyncQueue = _markerSyncQueue
+        .then((_) => _syncFestivalMarkers(controller, festivals))
+        .catchError((Object error, StackTrace stackTrace) {
+          debugPrint('마커 동기화 실패: $error');
+        });
+  }
+
+  Future<void> _handleCameraIdle() async {
+    final controller = _mapController;
+    if (controller == null) return;
+    final zoom = (await controller.getCameraPosition()).zoom;
+    final bucket = zoom < 9
+        ? 0
+        : zoom < 11.5
+        ? 1
+        : 2;
+    if (bucket == _zoomBucket || !identical(_mapController, controller)) return;
+    _zoomBucket = bucket;
+    _queueFestivalMarkerSync(
+      controller,
+      ref.read(mapViewModelProvider).visibleFestivals,
+    );
   }
 
   Future<void> _syncFestivalMarkers(
@@ -190,34 +222,58 @@ class _MapPageState extends ConsumerState<MapPage> {
   ) async {
     if (!identical(_mapController, controller)) return;
     try {
-      await controller.clearOverlays(type: NOverlayType.marker);
-      await controller.clearOverlays(type: NOverlayType.circleOverlay);
-      if (!identical(_mapController, controller)) return;
       final analyses = ref.read(mapViewModelProvider).analyses;
       final markers = <NMarker>{};
       final crowdAreas = <NCircleOverlay>{};
-      for (final festival in festivals.where(
-        (festival) =>
-            festival.latitude >= -90 &&
-            festival.latitude <= 90 &&
-            festival.longitude >= -180 &&
-            festival.longitude <= 180,
-      )) {
+      final validFestivals = festivals
+          .where(
+            (festival) =>
+                festival.latitude >= -90 &&
+                festival.latitude <= 90 &&
+                festival.longitude >= -180 &&
+                festival.longitude <= 180,
+          )
+          .toList(growable: false);
+      final visibleIds = validFestivals.map((festival) => festival.id).toSet();
+      for (final removedId
+          in _renderedMarkerSignatures.keys
+              .where((id) => !visibleIds.contains(id))
+              .toList()) {
+        await controller.deleteOverlay(
+          NOverlayInfo(
+            type: _renderedOverlayTypes[removedId]!,
+            id: _overlayId(removedId, _renderedOverlayTypes[removedId]!),
+          ),
+        );
+        _renderedMarkerSignatures.remove(removedId);
+        _renderedOverlayTypes.remove(removedId);
+      }
+      for (final festival in validFestivals) {
         final analysis = analyses[festival.id];
-        final icon = analysis == null ? null : await _crowdMarkerIcon(analysis);
+        final signature = analysis == null
+            ? 'pending'
+            : '${analysis.overall.level.name}:$_zoomBucket';
+        if (_renderedMarkerSignatures[festival.id] == signature) continue;
+        final oldType = _renderedOverlayTypes[festival.id];
+        if (oldType != null) {
+          await controller.deleteOverlay(
+            NOverlayInfo(type: oldType, id: _overlayId(festival.id, oldType)),
+          );
+        }
         if (!identical(_mapController, controller)) return;
         if (analysis != null) {
-          final color = _crowdColor(analysis.overall.level);
-          final area =
-              NCircleOverlay(
-                id: 'crowd_area_${festival.id}',
-                center: NLatLng(festival.latitude, festival.longitude),
-                radius: _crowdAreaRadius(analysis.overall.level),
-                color: color.withValues(
-                  alpha: _crowdAreaOpacity(analysis.overall.score),
-                ),
-                outlineColor: color.withValues(alpha: .5),
-                outlineWidth: 1.5,
+          final size = _crowdMarkerSize(analysis.overall.level, _zoomBucket);
+          final icon = await _crowdMarkerIcon(analysis);
+          if (!identical(_mapController, controller)) return;
+          final marker =
+              NMarker(
+                id: 'festival_${festival.id}',
+                position: NLatLng(festival.latitude, festival.longitude),
+                icon: icon,
+                size: size,
+                anchor: const NPoint(.5, .5),
+                iconTintColor: Colors.transparent,
+                isForceShowIcon: true,
               )..setOnTapListener((_) {
                 unawaited(
                   ref
@@ -225,29 +281,30 @@ class _MapPageState extends ConsumerState<MapPage> {
                       .selectFestival(festival.id),
                 );
               });
-          crowdAreas.add(area);
+          markers.add(marker);
+          _renderedOverlayTypes[festival.id] = NOverlayType.marker;
+        } else {
+          // 분석 응답을 기다리는 동안에도 네이버 지도의 기본 핀은 노출하지
+          // 않고, 결과가 도착하면 혼잡도 색상 영역으로 교체합니다.
+          final pendingArea =
+              NCircleOverlay(
+                id: 'crowd_pending_${festival.id}',
+                center: NLatLng(festival.latitude, festival.longitude),
+                radius: 500,
+                color: const Color(0xFF7D8790).withValues(alpha: .14),
+                outlineColor: const Color(0xFF7D8790).withValues(alpha: .3),
+                outlineWidth: 1,
+              )..setOnTapListener((_) {
+                unawaited(
+                  ref
+                      .read(mapViewModelProvider.notifier)
+                      .selectFestival(festival.id),
+                );
+              });
+          crowdAreas.add(pendingArea);
+          _renderedOverlayTypes[festival.id] = NOverlayType.circleOverlay;
         }
-        final marker =
-            NMarker(
-              id: 'festival_${festival.id}',
-              position: NLatLng(festival.latitude, festival.longitude),
-              icon: icon,
-              size: icon == null ? NMarker.autoSize : const Size(88, 38),
-              iconTintColor: icon == null
-                  ? const Color(0xFF777C85)
-                  : Colors.transparent,
-              caption: analysis == null
-                  ? NOverlayCaption(text: festival.title)
-                  : const NOverlayCaption(text: ''),
-              captionOffset: 4,
-            )..setOnTapListener((_) {
-              unawaited(
-                ref
-                    .read(mapViewModelProvider.notifier)
-                    .selectFestival(festival.id),
-              );
-            });
-        markers.add(marker);
+        _renderedMarkerSignatures[festival.id] = signature;
       }
       if (crowdAreas.isNotEmpty) {
         await controller.addOverlayAll(crowdAreas);
@@ -259,13 +316,14 @@ class _MapPageState extends ConsumerState<MapPage> {
   }
 
   Future<NOverlayImage> _crowdMarkerIcon(FestivalAnalysis analysis) {
-    final key = analysis.overall.level.name;
+    final key = '${analysis.overall.level.name}:$_zoomBucket';
     final cached = _crowdMarkerIcons[key];
     if (cached != null) return Future.value(cached);
+    final size = _crowdMarkerSize(analysis.overall.level, _zoomBucket);
     return NOverlayImage.fromWidget(
       context: context,
-      size: const Size(88, 38),
-      widget: _CrowdLevelMarker(
+      size: size,
+      widget: _CrowdHeatMarker(
         label: _crowdLabel(analysis.overall.level),
         color: _crowdColor(analysis.overall.level),
       ),
@@ -284,7 +342,7 @@ class _MapPageState extends ConsumerState<MapPage> {
       (_, festivals) {
         final controller = _mapController;
         if (controller != null) {
-          unawaited(_syncFestivalMarkers(controller, festivals));
+          _queueFestivalMarkerSync(controller, festivals);
         }
       },
     );
@@ -293,11 +351,21 @@ class _MapPageState extends ConsumerState<MapPage> {
       (_, _) {
         final controller = _mapController;
         if (controller != null) {
-          unawaited(
-            _syncFestivalMarkers(
-              controller,
-              ref.read(mapViewModelProvider).visibleFestivals,
-            ),
+          _queueFestivalMarkerSync(
+            controller,
+            ref.read(mapViewModelProvider).visibleFestivals,
+          );
+        }
+      },
+    );
+    ref.listen<int?>(
+      mapViewModelProvider.select((value) => value.selectedFestivalId),
+      (_, _) {
+        final controller = _mapController;
+        if (controller != null) {
+          _queueFestivalMarkerSync(
+            controller,
+            ref.read(mapViewModelProvider).visibleFestivals,
           );
         }
       },
@@ -318,6 +386,7 @@ class _MapPageState extends ConsumerState<MapPage> {
               child: _NaverCrowdMap(
                 isCardVisible: state.selectedFestivalId != null,
                 onMapReady: _handleMapReady,
+                onCameraIdle: _handleCameraIdle,
                 onMapTapped: viewModel.clearSelectedFestival,
               ),
             ),
@@ -397,8 +466,8 @@ class _MapPageState extends ConsumerState<MapPage> {
                   analysis: state.selectedAnalysis,
                   isAnalyzing: state.isSelectedFestivalAnalyzing,
                   onClose: viewModel.clearSelectedFestival,
-                  onTap: () => context.push(
-                    AppRoutes.detail(state.selectedFestivalId!.toString()),
+                  onTap: () => context.go(
+                    AppRoutes.analysisFor(state.selectedFestivalId!.toString()),
                   ),
                 ),
               ),
@@ -413,11 +482,13 @@ class _NaverCrowdMap extends StatelessWidget {
   const _NaverCrowdMap({
     required this.isCardVisible,
     required this.onMapReady,
+    required this.onCameraIdle,
     required this.onMapTapped,
   });
 
   final bool isCardVisible;
   final ValueChanged<NaverMapController> onMapReady;
+  final VoidCallback onCameraIdle;
   final VoidCallback onMapTapped;
 
   static const _yeouido = NLatLng(37.5283, 126.9326);
@@ -448,6 +519,7 @@ class _NaverCrowdMap extends StatelessWidget {
       ),
       onMapTapped: (point, position) => onMapTapped(),
       onMapReady: onMapReady,
+      onCameraIdle: onCameraIdle,
     );
   }
 }
@@ -977,29 +1049,50 @@ class _TimeSlotBars extends StatelessWidget {
   );
 }
 
-class _CrowdLevelMarker extends StatelessWidget {
-  const _CrowdLevelMarker({required this.label, required this.color});
+class _CrowdHeatMarker extends StatelessWidget {
+  const _CrowdHeatMarker({required this.label, required this.color});
   final String label;
   final Color color;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => Stack(
     alignment: Alignment.center,
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: Colors.white, width: 2),
-      boxShadow: const [BoxShadow(color: Color(0x44000000), blurRadius: 8)],
-    ),
-    child: Text(
-      label,
-      maxLines: 1,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
+    children: [
+      Positioned.fill(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [
+                color.withValues(alpha: .58),
+                color.withValues(alpha: .38),
+                color.withValues(alpha: .16),
+                color.withValues(alpha: 0),
+              ],
+              stops: const [0, .34, .7, 1],
+            ),
+          ),
+        ),
       ),
-    ),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: Colors.white, width: 1.5),
+          boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 7)],
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    ],
   );
 }
 
@@ -1016,22 +1109,32 @@ class _CrowdMapLegend extends StatelessWidget {
         boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 8)],
       ),
       child: const Text(
-        '색이 진할수록 혼잡해요 · 원 크기는 단계 표시용',
+        '색이 진하고 넓을수록 더 혼잡해요 · 마커를 눌러 상세 확인',
         style: TextStyle(fontSize: 11, color: _muted),
       ),
     ),
   );
 }
 
-double _crowdAreaOpacity(int score) =>
-    (.12 + score.clamp(0, 100) * .0024).clamp(.12, .36).toDouble();
+String _overlayId(int festivalId, NOverlayType type) =>
+    type == NOverlayType.marker
+    ? 'festival_$festivalId'
+    : 'crowd_pending_$festivalId';
 
-double _crowdAreaRadius(CrowdLevel level) => switch (level) {
-  CrowdLevel.low => 220,
-  CrowdLevel.medium => 300,
-  CrowdLevel.high => 380,
-  CrowdLevel.veryHigh => 460,
-};
+Size _crowdMarkerSize(CrowdLevel level, int zoomBucket) {
+  final base = switch (level) {
+    CrowdLevel.low => const Size(140, 110),
+    CrowdLevel.medium => const Size(170, 130),
+    CrowdLevel.high => const Size(200, 150),
+    CrowdLevel.veryHigh => const Size(230, 170),
+  };
+  final scale = switch (zoomBucket) {
+    0 => .42,
+    1 => .68,
+    _ => 1.0,
+  };
+  return Size(base.width * scale, base.height * scale);
+}
 
 Color _crowdColor(CrowdLevel level) => switch (level) {
   CrowdLevel.low => const Color(0xFF1FA97A),

@@ -72,6 +72,20 @@ class AnalysisViewModel extends AutoDisposeAsyncNotifier<AnalysisViewState> {
     });
   }
 
+  Future<void> analyzeFestivalForToday(int festivalId) async {
+    final festival = await ref
+        .read(festivalRepositoryProvider)
+        .getDetail(festivalId);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final visitDate = today.isBefore(festival.startDate)
+        ? festival.startDate
+        : today.isAfter(festival.endDate)
+        ? festival.endDate
+        : today;
+    await analyzeFestival(festivalId, visitDate);
+  }
+
   Future<void> chooseAnotherFestival() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
@@ -87,7 +101,11 @@ class AnalysisViewModel extends AutoDisposeAsyncNotifier<AnalysisViewState> {
     final today = DateTime(now.year, now.month, now.day);
     final page = await ref
         .read(festivalRepositoryProvider)
-        .search(from: today, to: today.add(const Duration(days: 90)), size: 5);
+        .search(
+          from: today,
+          to: today.add(const Duration(days: 90)),
+          size: 100,
+        );
     return AnalysisViewState.selecting(festivals: page.items);
   }
 

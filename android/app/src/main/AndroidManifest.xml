@@ -7,10 +7,10 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
-        android:label="gallaemalae"
+        android:label="갈래말래"
         android:name="${applicationName}"
         android:enableOnBackInvokedCallback="false"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"

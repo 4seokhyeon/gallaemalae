@@ -105,7 +105,13 @@ class MapViewModel extends AutoDisposeNotifier<MapViewState> {
             size: 100,
           );
       state = state.copyWith(festivals: page.items, isLoading: false);
-      await analyzeNearest(latitude: 37.5283, longitude: 126.9326, limit: 5);
+      // 지도에 노출되는 모든 축제를 가까운 순서부터 분석합니다. API가 축제별
+      // 분석만 지원하므로 2개씩 호출해 서버 부하와 502/timeout 위험을 줄입니다.
+      await analyzeNearest(
+        latitude: 37.5283,
+        longitude: 126.9326,
+        limit: page.items.length,
+      );
     } catch (error) {
       state = state.copyWith(isLoading: false, errorMessage: error.toString());
     }

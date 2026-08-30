@@ -149,8 +149,8 @@ class _IOSNativeTabBar extends StatelessWidget {
                 (event.localPosition.dx / constraints.maxWidth * 4)
                     .floor()
                     .clamp(0, 3);
-            // cupertino_native는 같은 탭 재선택 콜백을 보내지 않으므로
-            // 해당 경우만 Flutter 포인터 단계에서 보완합니다.
+            // CNTabBar는 선택된 탭 재탭 콜백을 보내지 않으므로 스크롤을
+            // 최상단으로 이동시키는 동작만 Flutter 포인터 단계에서 보완합니다.
             if (tappedIndex == currentIndex) onTap(tappedIndex);
           },
           child: CNTabBar(

@@ -9,11 +9,47 @@ import 'package:gallaemalae/features/analysis/presentation/view_models/analysis_
 const _brand = Color(0xFFC93A06);
 const _background = Color(0xFFF7F7FA);
 
-class AnalysisPage extends ConsumerWidget {
-  const AnalysisPage({super.key});
+class AnalysisPage extends ConsumerStatefulWidget {
+  const AnalysisPage({this.requestedFestivalId, super.key});
+
+  final int? requestedFestivalId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AnalysisPage> createState() => _AnalysisPageState();
+}
+
+class _AnalysisPageState extends ConsumerState<AnalysisPage> {
+  int? _handledFestivalId;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleRequestedFestival();
+  }
+
+  @override
+  void didUpdateWidget(covariant AnalysisPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.requestedFestivalId != widget.requestedFestivalId) {
+      _scheduleRequestedFestival();
+    }
+  }
+
+  void _scheduleRequestedFestival() {
+    final festivalId = widget.requestedFestivalId;
+    if (festivalId == null || festivalId == _handledFestivalId) return;
+    _handledFestivalId = festivalId;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(analysisViewModelProvider.future);
+      if (!mounted || widget.requestedFestivalId != festivalId) return;
+      await ref
+          .read(analysisViewModelProvider.notifier)
+          .analyzeFestivalForToday(festivalId);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(analysisViewModelProvider);
     final body = state.when(
       loading: () => const Center(child: CircularProgressIndicator()),

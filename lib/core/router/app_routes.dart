@@ -12,4 +12,6 @@ abstract final class AppRoutes {
   static const visitPlans = '/visit-plans';
 
   static String detail(String placeId) => '/detail/$placeId';
+  static String analysisFor(String festivalId) =>
+      '$analysis?festivalId=${Uri.encodeQueryComponent(festivalId)}';
 }

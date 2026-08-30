@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' hide DayPeriod;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gallaemalae/app/app.dart';
+import 'package:gallaemalae/core/router/app_routes.dart';
 import 'package:gallaemalae/data/repositories/repository_providers.dart';
 import 'package:gallaemalae/domain/entities/festival_personality.dart';
 import 'package:gallaemalae/domain/entities/festival.dart';
@@ -152,10 +153,14 @@ class _FallbackFestivalRepository extends _FakeFestivalRepository {
 }
 
 class _FakeUserActivityRepository implements UserActivityRepository {
-  _FakeUserActivityRepository([Map<String, String>? settings])
-    : _settings = {...?settings};
+  _FakeUserActivityRepository([
+    Map<String, String>? settings,
+    List<FavoritePlace> favorites = const [],
+  ]) : _settings = {...?settings},
+       _favorites = favorites;
 
   final Map<String, String> _settings;
+  final List<FavoritePlace> _favorites;
 
   @override
   Future<void> deleteFavorite(String placeId) async {}
@@ -168,7 +173,7 @@ class _FakeUserActivityRepository implements UserActivityRepository {
   @override
   Future<void> saveVisit(Visit visit) async {}
   @override
-  Stream<List<FavoritePlace>> watchFavorites() => Stream.value(const []);
+  Stream<List<FavoritePlace>> watchFavorites() => Stream.value(_favorites);
   @override
   Stream<List<Visit>> watchVisits() => Stream.value(const []);
   @override
@@ -493,7 +498,7 @@ void main() {
 
     expect(find.text('어떤 축제가 궁금하세요?'), findsOneWidget);
     expect(find.text('테스트 축제'), findsOneWidget);
-    expect(_FakeFestivalRepository.lastSize, 5);
+    expect(_FakeFestivalRepository.lastSize, 100);
     expect(
       _FakeFestivalRepository.lastTo!.difference(
         _FakeFestivalRepository.lastFrom!,
@@ -501,6 +506,10 @@ void main() {
       const Duration(days: 90),
     );
     expect(tester.takeException(), isNull);
+  });
+
+  test('지도에서 선택한 축제 ID를 분석 탭 라우트에 전달한다', () {
+    expect(AppRoutes.analysisFor('131'), '/analysis?festivalId=131');
   });
 
   testWidgets('분석 결과에 데이터 상태와 갱신 정보를 표시한다', (tester) async {
@@ -809,6 +818,41 @@ void main() {
     final exception = tester.takeException();
     debugDefaultTargetPlatformOverride = null;
     expect(find.text('변경 이름 님'), findsOneWidget);
+    expect(exception, isNull);
+  });
+
+  testWidgets('iOS 프로필의 관심 축제 카드는 Material 예외 없이 렌더링된다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final favorite = FavoritePlace(
+      placeId: '131',
+      name: '서울 불꽃 축제',
+      latitude: 37.5,
+      longitude: 126.9,
+      createdAt: DateTime(2026),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          personalityRepositoryProvider.overrideWithValue(
+            _FakePersonalityRepository(_completedPersonality),
+          ),
+          userActivityRepositoryProvider.overrideWithValue(
+            _FakeUserActivityRepository(
+              const {'user_name_v1': '테스트 사용자'},
+              [favorite],
+            ),
+          ),
+        ],
+        child: const CupertinoApp(home: ProfilePage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final exception = tester.takeException();
+    debugDefaultTargetPlatformOverride = null;
+    expect(find.text('서울 불꽃 축제'), findsOneWidget);
     expect(exception, isNull);
   });
 }

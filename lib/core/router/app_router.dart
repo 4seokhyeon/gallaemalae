@@ -56,8 +56,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: AppRoutes.analysis,
-            pageBuilder: (_, _) =>
-                const NoTransitionPage(child: AnalysisPage()),
+            pageBuilder: (_, state) => NoTransitionPage(
+              child: AnalysisPage(
+                requestedFestivalId: int.tryParse(
+                  state.uri.queryParameters['festivalId'] ?? '',
+                ),
+              ),
+            ),
           ),
           GoRoute(
             path: AppRoutes.profile,
